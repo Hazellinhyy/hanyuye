@@ -1,0 +1,9 @@
+package com.hfut.cat_adoption_system.dto;
+
+import jakarta.validation.constraints.NotBlank;
+
+public record FollowupAbnormalRequest(
+        @NotBlank String abnormalDesc,
+        String volunteerComment
+) {
+}
