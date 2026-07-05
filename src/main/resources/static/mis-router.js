@@ -3556,25 +3556,6 @@ ${detail.agreementContent || "-"}`;
                 "\u7ec4\u7ec7\u6210\u81ea\u7136\u3001\u6e05\u695a\u7684\u56de\u7b54"
             ];
         };
-        const buildThoughtSummary = (question, answer) => {
-            const value = String(question || "").trim();
-            const reply = String(answer || "").trim();
-            const shortTopic = value.length > 28 ? value.slice(0, 28) + "..." : value;
-            const replyHint = reply.length > 42 ? reply.slice(0, 42) + "..." : reply;
-            if (/\u4f5c\u6587|\u6587\u7ae0|\u6587\u6848|\u5199|essay|article|copy/i.test(value)) {
-                return `\u601d\u8003\u6458\u8981\uff1a\u8fd9\u4e2a\u95ee\u9898\u7684\u6838\u5fc3\u662f\u5b8c\u6210\u5199\u4f5c\u4efb\u52a1\u201c${shortTopic}\u201d\uff0c\u56e0\u6b64\u56de\u7b54\u4f18\u5148\u56f4\u7ed5\u4e3b\u9898\u3001\u6587\u7ae0\u7ed3\u6784\u548c\u8868\u8fbe\u8fde\u8d2f\u6027\u5c55\u5f00\uff0c\u5e76\u5c3d\u91cf\u8ba9\u6210\u6587\u53ef\u76f4\u63a5\u4f7f\u7528\u3002`;
-            }
-            if (/\u8ba4\u517b|\u9886\u517b|\u732b|\u7533\u8bf7|\u9002\u5e94\u671f|adopt|cat/i.test(value)) {
-                return `\u601d\u8003\u6458\u8981\uff1a\u8fd9\u4e2a\u95ee\u9898\u4e0e\u8ba4\u517b\u573a\u666f\u76f8\u5173\uff0c\u6240\u4ee5\u56de\u7b54\u4f18\u5148\u533a\u5206\u5fc5\u5907\u4e8b\u9879\u548c\u5efa\u8bae\u4e8b\u9879\uff0c\u518d\u6309\u6d41\u7a0b\u3001\u7528\u54c1\u3001\u7167\u62a4\u548c\u98ce\u9669\u63d0\u9192\u7ec4\u7ec7\u6210\u5bb9\u6613\u6267\u884c\u7684\u5185\u5bb9\u3002`;
-            }
-            if (/\u4ee3\u7801|\u7a0b\u5e8f|bug|\u62a5\u9519|code|error|api/i.test(value)) {
-                return `\u601d\u8003\u6458\u8981\uff1a\u8fd9\u4e2a\u95ee\u9898\u504f\u6280\u672f\u6392\u67e5\u6216\u5b9e\u73b0\uff0c\u56e0\u6b64\u56de\u7b54\u4f1a\u5148\u9501\u5b9a\u76ee\u6807\uff0c\u518d\u628a\u53ef\u80fd\u539f\u56e0\u3001\u4fee\u6539\u65b9\u5411\u548c\u9a8c\u8bc1\u6b65\u9aa4\u653e\u5230\u66f4\u53ef\u64cd\u4f5c\u7684\u987a\u5e8f\u91cc\u3002`;
-            }
-            if (/\u6e05\u5355|\u8ba1\u5212|\u6b65\u9aa4|\u600e\u4e48|how|plan|list/i.test(value)) {
-                return `\u601d\u8003\u6458\u8981\uff1a\u8fd9\u4e2a\u95ee\u9898\u9700\u8981\u53ef\u6267\u884c\u7684\u7ed3\u679c\uff0c\u6240\u4ee5\u56de\u7b54\u5148\u62c6\u89e3\u76ee\u6807\uff0c\u518d\u6309\u4f18\u5148\u7ea7\u6216\u884c\u52a8\u987a\u5e8f\u7ec4\u7ec7\uff0c\u907f\u514d\u53ea\u7ed9\u62bd\u8c61\u5efa\u8bae\u3002`;
-            }
-            return `\u601d\u8003\u6458\u8981\uff1a\u6211\u5148\u5224\u65ad\u4f60\u7684\u6838\u5fc3\u95ee\u9898\u662f\u201c${shortTopic}\u201d\uff0c\u518d\u6839\u636e\u95ee\u9898\u9700\u8981\u9009\u62e9\u76f4\u63a5\u56de\u7b54\u3001\u5206\u6b65\u8bf4\u660e\u6216\u8865\u5145\u80cc\u666f\u3002\u6700\u7ec8\u56de\u7b54\u56f4\u7ed5\u201c${replyHint}\u201d\u8fd9\u4e2a\u65b9\u5411\u7ec4\u7ec7\u3002`;
-        };
         const ask = async question => {
             const text = String(question || "").trim();
             if (!text) return;
@@ -3618,13 +3599,6 @@ ${detail.agreementContent || "-"}`;
                 }
                 finishThinking();
                 thinking.textContent = clean(answer) || "No valid answer was generated.";
-                const thoughtSummary = buildThoughtSummary(text, thinking.textContent);
-                if (thoughtSummary && !thinking.nextElementSibling?.classList?.contains("agent-thought-detail")) {
-                    const detail = document.createElement("details");
-                    detail.className = "agent-thought-detail";
-                    detail.innerHTML = `<summary>&#26597;&#30475;&#24605;&#32771;&#25688;&#35201;</summary><p>${escapeHtml(thoughtSummary)}</p>`;
-                    thinking.after(detail);
-                }
                 history[history.length - 1] = { role: "assistant", content: thinking.textContent };
                 return;
                 const local = localAnswers.find(item => item.test(text));
