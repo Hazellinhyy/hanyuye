@@ -1049,26 +1049,6 @@
         userShell(route, user, `
             ${pageHero(route)}
             <form class="mis-form" id="clue-submit-form">
-                <label class="wide clue-select-field">发现地点
-                    <select id="found-location-select" class="clue-choice-select">
-                        <option value="">请选择发现地点</option>
-                        <option value="翡翠湖校区二食堂北门">二食堂北门</option>
-                        <option value="翡翠湖校区图书馆东侧">图书馆东侧</option>
-                        <option value="翡翠湖校区宿舍区楼下">宿舍区楼下</option>
-                        <option value="翡翠湖校区教学楼附近">教学楼附近</option>
-                        <option value="翡翠湖校区东门附近">东门附近</option>
-                        <option value="翡翠湖校区操场看台">操场看台</option>
-                        <option value="翡翠湖校区快递站附近">快递站附近</option>
-                        <option value="翡翠湖校区校医院门口">校医院门口</option>
-                        <option value="翡翠湖校区湖边草坪">湖边草坪</option>
-                        <option value="屯溪路校区主楼附近">屯溪路主楼</option>
-                        <option value="屯溪路校区南门附近">屯溪路南门</option>
-                        <option value="宣城校区食堂附近">宣城食堂</option>
-                        <option value="__custom__">新增/自定义发现地点</option>
-                    </select>
-                    <input name="foundLocation" class="clue-custom-input" placeholder="请输入新的发现地点">
-                    <button class="ghost-btn compact add-choice-btn" type="button" data-save-custom="foundLocation">保存到下拉框</button>
-                </label>
                 <label class="wide clue-select-field">校园区域
                     <select id="found-area-select" class="clue-choice-select">
                         <option value="">请选择校园区域</option>
@@ -1088,6 +1068,26 @@
                     </select>
                     <input name="foundArea" class="clue-custom-input" placeholder="请输入新的校园区域">
                     <button class="ghost-btn compact add-choice-btn" type="button" data-save-custom="foundArea">保存到下拉框</button>
+                </label>
+                <label class="wide clue-select-field">发现地点
+                    <select id="found-location-select" class="clue-choice-select">
+                        <option value="">请选择发现地点</option>
+                        <option value="翡翠湖校区二食堂北门">二食堂北门</option>
+                        <option value="翡翠湖校区图书馆东侧">图书馆东侧</option>
+                        <option value="翡翠湖校区宿舍区楼下">宿舍区楼下</option>
+                        <option value="翡翠湖校区教学楼附近">教学楼附近</option>
+                        <option value="翡翠湖校区东门附近">东门附近</option>
+                        <option value="翡翠湖校区操场看台">操场看台</option>
+                        <option value="翡翠湖校区快递站附近">快递站附近</option>
+                        <option value="翡翠湖校区校医院门口">校医院门口</option>
+                        <option value="翡翠湖校区湖边草坪">湖边草坪</option>
+                        <option value="屯溪路校区主楼附近">屯溪路主楼</option>
+                        <option value="屯溪路校区南门附近">屯溪路南门</option>
+                        <option value="宣城校区食堂附近">宣城食堂</option>
+                        <option value="__custom__">新增/自定义发现地点</option>
+                    </select>
+                    <input name="foundLocation" class="clue-custom-input" placeholder="请输入新的发现地点">
+                    <button class="ghost-btn compact add-choice-btn" type="button" data-save-custom="foundLocation">保存到下拉框</button>
                 </label>
                 <label class="clue-time-field">发现时间
                     <span class="clue-time-row">
