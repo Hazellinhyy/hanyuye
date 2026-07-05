@@ -1006,6 +1006,36 @@
         const label = select.closest("label");
         const saveButton = label?.querySelector("[data-save-custom]");
         const customOption = [...select.options].find(option => option.value === "__custom__");
+        const optionList = document.createElement("div");
+        optionList.className = "clue-option-list";
+        select.insertAdjacentElement("afterend", optionList);
+        const renderOptions = () => {
+            optionList.innerHTML = "";
+            [...select.options]
+                .filter(option => option.value && option.value !== "__custom__")
+                .forEach(option => {
+                    const item = document.createElement("span");
+                    item.className = "clue-option-item";
+                    item.textContent = option.textContent;
+                    const remove = document.createElement("button");
+                    remove.type = "button";
+                    remove.className = "clue-option-remove";
+                    remove.setAttribute("aria-label", `删除${option.textContent}`);
+                    remove.textContent = "\u00d7";
+                    remove.addEventListener("click", () => {
+                        if (!window.confirm(`确定删除“${option.textContent}”这个选项吗？`)) return;
+                        const removedValue = option.value;
+                        option.remove();
+                        if (select.value === removedValue || input.value === removedValue) {
+                            select.value = "";
+                            input.value = "";
+                        }
+                        renderOptions();
+                    });
+                    item.appendChild(remove);
+                    optionList.appendChild(item);
+                });
+        };
         const setCustomMode = active => {
             input.classList.toggle("is-visible", active);
             saveButton?.classList.toggle("is-visible", active);
@@ -1034,6 +1064,7 @@
             }
             select.value = value;
             input.value = value;
+            renderOptions();
             setCustomMode(false);
         };
         saveButton?.addEventListener("click", saveCustom);
@@ -1042,6 +1073,7 @@
             event.preventDefault();
             saveCustom();
         });
+        renderOptions();
         setCustomMode(false);
     }
 

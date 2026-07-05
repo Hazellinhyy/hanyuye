@@ -2629,6 +2629,45 @@ body.mis-active #mis-shell {
     display: block;
 }
 
+.clue-option-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.clue-option-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    border: 1px solid rgba(38, 116, 93, 0.13);
+    border-radius: 999px;
+    background: rgba(248, 252, 250, 0.82);
+    color: #315b49;
+    padding: 6px 8px 6px 12px;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.clue-option-remove {
+    display: inline-grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(159, 52, 40, 0.08);
+    color: #9f3428;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 950;
+    line-height: 1;
+}
+
+.clue-option-remove:hover {
+    background: rgba(159, 52, 40, 0.16);
+}
+
 .clue-select-field .add-choice-btn.is-visible {
     display: inline-flex;
 }
