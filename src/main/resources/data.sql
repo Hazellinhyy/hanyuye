@@ -83,9 +83,37 @@ INSERT IGNORE INTO t_followup
 VALUES
 ('RF260520001', 'APP260509001', '2026-05-20 20:00:00', '线上', '精神和食欲正常，已适应新环境。', '门窗防护到位，猫砂盆和饮水位置合理。', 'NORMAL', '/uploads/cats/cat_04_03.jpg', '继续按月回访。', '猫咪志愿者小组');
 
-INSERT IGNORE INTO t_notice (notice_id, title, content, publisher, published_at) VALUES
-('NT260508001', '真实猫咪档案已导入', '系统已导入校园流浪猫档案、多角度照片、医疗和回访演示数据。', '猫咪志愿者小组', '2026-05-08 12:35:00'),
-('NT260508002', '认养前请确认长期照护条件', '申请人需如实填写住房、家庭或室友态度、经济能力、寒暑假安排，并同意后续回访。', '后勤管理部门', '2026-05-08 12:36:00');
+INSERT INTO system_message
+(user_id, receiver_id, message_type, title, content, related_type, related_id, biz_type, biz_id,
+ read_flag, read_status, status, deleted, create_by, update_by, create_time, update_time)
+SELECT u.user_id, u.user_id, 'SYSTEM', '真实猫咪档案已导入',
+       '系统已导入校园流浪猫档案、多角度照片、医疗和回访演示数据。',
+       'SYSTEM', 'MSG_NOTICE_ARCHIVE_IMPORTED', 'SYSTEM', 'MSG_NOTICE_ARCHIVE_IMPORTED',
+       0, 'UNREAD', 'VALID', 0, 'SYSTEM', 'SYSTEM', '2026-05-08 12:35:00', '2026-05-08 12:35:00'
+FROM t_user u
+WHERE u.status = 1
+  AND NOT EXISTS (
+      SELECT 1 FROM system_message sm
+      WHERE COALESCE(sm.deleted, 0) = 0
+        AND sm.receiver_id = u.user_id
+        AND sm.title = '真实猫咪档案已导入'
+  );
+
+INSERT INTO system_message
+(user_id, receiver_id, message_type, title, content, related_type, related_id, biz_type, biz_id,
+ read_flag, read_status, status, deleted, create_by, update_by, create_time, update_time)
+SELECT u.user_id, u.user_id, 'SYSTEM', '认养前请确认长期照护条件',
+       '申请人需如实填写住房、家庭或室友态度、经济能力、寒暑假安排，并同意后续回访。',
+       'SYSTEM', 'MSG_LONG_TERM_CARE_CONDITION', 'SYSTEM', 'MSG_LONG_TERM_CARE_CONDITION',
+       0, 'UNREAD', 'VALID', 0, 'SYSTEM', 'SYSTEM', '2026-05-08 12:36:00', '2026-05-08 12:36:00'
+FROM t_user u
+WHERE u.status = 1
+  AND NOT EXISTS (
+      SELECT 1 FROM system_message sm
+      WHERE COALESCE(sm.deleted, 0) = 0
+        AND sm.receiver_id = u.user_id
+        AND sm.title = '认养前请确认长期照护条件'
+  );
 
 INSERT IGNORE INTO t_product (product_id, product_name, category, price, image_url, description, pay_url, status, created_at) VALUES
 ('PD260508001', '校园猫咪陶瓷杯', '杯子', 29.90, '/uploads/catalog/product-cup.jpg', '三花猫主题陶瓷杯，收益用于校园流浪猫救助。', 'alipay://platformapi/startapp?appId=20000067', 1, '2026-05-08 17:10:00'),

@@ -23,18 +23,22 @@ public interface NoticeMapper {
             @Arg(column = "publisher", javaType = String.class),
             @Arg(column = "pinned", javaType = boolean.class),
             @Arg(column = "enabled", javaType = boolean.class),
-            @Arg(column = "published_at", javaType = java.time.LocalDateTime.class)
+            @Arg(column = "published_at", javaType = java.time.LocalDateTime.class),
+            @Arg(column = "image_url", javaType = String.class),
+            @Arg(column = "target_roles", javaType = String.class)
     })
     @Select("""
             <script>
-            SELECT n.notice_id, n.title, n.content, u.user_name AS publisher, n.pinned,
+            SELECT n.notice_id, n.title, n.content, COALESCE(u.user_name, '系统') AS publisher, n.pinned,
                    CASE WHEN n.publish_status = 'PUBLISHED' THEN 1 ELSE 0 END AS enabled,
-                   n.publish_time AS published_at
+                   n.publish_time AS published_at,
+                   n.image_url,
+                   COALESCE(n.target_roles, 'STUDENT,VOLUNTEER,HOSPITAL,ADMIN') AS target_roles
             FROM t_notice n
-            JOIN t_user u ON u.user_id = n.publisher_id
+            LEFT JOIN t_user u ON u.user_id = n.publisher_id
             WHERE COALESCE(n.deleted, 0) = 0
             <if test="enabledOnly">AND n.publish_status = 'PUBLISHED'</if>
-            ORDER BY n.pinned DESC, n.publish_time DESC
+            ORDER BY n.pinned DESC, COALESCE(n.sort_order, 0) DESC, n.publish_time DESC
             </script>
             """)
     List<Notice> findAll(@Param("enabledOnly") boolean enabledOnly);
@@ -46,32 +50,39 @@ public interface NoticeMapper {
             @Arg(column = "publisher", javaType = String.class),
             @Arg(column = "pinned", javaType = boolean.class),
             @Arg(column = "enabled", javaType = boolean.class),
-            @Arg(column = "published_at", javaType = java.time.LocalDateTime.class)
+            @Arg(column = "published_at", javaType = java.time.LocalDateTime.class),
+            @Arg(column = "image_url", javaType = String.class),
+            @Arg(column = "target_roles", javaType = String.class)
     })
     @Select("""
-            SELECT n.notice_id, n.title, n.content, u.user_name AS publisher, n.pinned,
+            SELECT n.notice_id, n.title, n.content, COALESCE(u.user_name, '系统') AS publisher, n.pinned,
                    CASE WHEN n.publish_status = 'PUBLISHED' THEN 1 ELSE 0 END AS enabled,
-                   n.publish_time AS published_at
+                   n.publish_time AS published_at,
+                   n.image_url,
+                   COALESCE(n.target_roles, 'STUDENT,VOLUNTEER,HOSPITAL,ADMIN') AS target_roles
             FROM t_notice n
-            JOIN t_user u ON u.user_id = n.publisher_id
+            LEFT JOIN t_user u ON u.user_id = n.publisher_id
             WHERE n.notice_id = #{noticeId}
             """)
     Notice findById(String noticeId);
 
     @Insert("""
             INSERT INTO t_notice (notice_id, title, content, publisher_id, pinned, publish_status, publish_time,
-                                  notice_type, sort_order, deleted, create_time, update_time)
+                                  notice_type, sort_order, image_url, target_roles, deleted, create_time, update_time)
             VALUES (#{noticeId}, #{title}, #{content},
                     COALESCE((SELECT user_id FROM t_user WHERE user_name = #{publisher} LIMIT 1), 'UDEMOADMIN'),
                     #{pinned}, CASE WHEN #{enabled} = 1 THEN 'PUBLISHED' ELSE 'OFFLINE' END, #{publishedAt},
-                    'SYSTEM', 0, 0, #{publishedAt}, #{publishedAt})
+                    'SYSTEM', 0, #{imageUrl}, COALESCE(#{targetRoles}, 'STUDENT,VOLUNTEER,HOSPITAL,ADMIN'),
+                    0, COALESCE(#{publishedAt}, CURRENT_TIMESTAMP), COALESCE(#{publishedAt}, CURRENT_TIMESTAMP))
             """)
     void insert(Notice notice);
 
     @Update("""
             UPDATE t_notice SET title = #{title}, content = #{content},
                 publisher_id = COALESCE((SELECT user_id FROM t_user WHERE user_name = #{publisher} LIMIT 1), publisher_id),
-                pinned = #{pinned}, publish_status = CASE WHEN #{enabled} = 1 THEN 'PUBLISHED' ELSE 'OFFLINE' END
+                pinned = #{pinned}, publish_status = CASE WHEN #{enabled} = 1 THEN 'PUBLISHED' ELSE 'OFFLINE' END,
+                image_url = #{imageUrl},
+                target_roles = COALESCE(#{targetRoles}, 'STUDENT,VOLUNTEER,HOSPITAL,ADMIN')
             WHERE notice_id = #{noticeId}
             """)
     int update(Notice notice);
@@ -95,6 +106,8 @@ public interface NoticeMapper {
             @Arg(column = "publisher_name", javaType = String.class),
             @Arg(column = "publish_time", javaType = LocalDateTime.class),
             @Arg(column = "sort_order", javaType = Integer.class),
+            @Arg(column = "image_url", javaType = String.class),
+            @Arg(column = "target_roles", javaType = String.class),
             @Arg(column = "create_time", javaType = LocalDateTime.class),
             @Arg(column = "update_time", javaType = LocalDateTime.class)
     })
@@ -106,6 +119,8 @@ public interface NoticeMapper {
                    publisher_id, u.user_name AS publisher_name,
                    publish_time,
                    COALESCE(sort_order, 0) AS sort_order,
+                   image_url,
+                   COALESCE(target_roles, 'STUDENT,VOLUNTEER,HOSPITAL,ADMIN') AS target_roles,
                    create_time,
                    update_time
             FROM t_notice n
@@ -124,6 +139,8 @@ public interface NoticeMapper {
             UPDATE t_notice
             SET notice_type = #{noticeType}, publish_status = #{publishStatus}, publisher_id = #{publisherId},
                 sort_order = #{sortOrder},
+                image_url = #{imageUrl},
+                target_roles = #{targetRoles},
                 update_time = #{updatedAt}
             WHERE notice_id = #{noticeId}
             """)
@@ -132,6 +149,8 @@ public interface NoticeMapper {
                           @Param("publishStatus") String publishStatus,
                           @Param("publisherId") String publisherId,
                           @Param("sortOrder") Integer sortOrder,
+                          @Param("imageUrl") String imageUrl,
+                          @Param("targetRoles") String targetRoles,
                           @Param("updatedAt") LocalDateTime updatedAt);
 
     @Update("""

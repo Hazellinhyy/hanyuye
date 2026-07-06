@@ -13,6 +13,7 @@ public record MedicalRecord(
         boolean sterilized,
         String treatment,
         String doctorNote,
+        String attachmentUrl,
         LocalDateTime createdAt
 ) {
 }

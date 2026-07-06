@@ -12,6 +12,8 @@ public record NoticeAdminInfo(
         String publisherName,
         LocalDateTime publishTime,
         Integer sortOrder,
+        String imageUrl,
+        String targetRoles,
         LocalDateTime createTime,
         LocalDateTime updateTime
 ) {

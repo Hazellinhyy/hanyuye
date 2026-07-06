@@ -2,7 +2,9 @@ package com.hfut.cat_adoption_system.controller;
 
 import com.hfut.cat_adoption_system.common.ApiResponse;
 import com.hfut.cat_adoption_system.common.BusinessException;
+import com.hfut.cat_adoption_system.auth.RequireRole;
 import com.hfut.cat_adoption_system.dto.UploadResult;
+import com.hfut.cat_adoption_system.model.Role;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
@@ -23,9 +25,20 @@ public class UploadController {
     private static final Set<String> ALLOWED_TYPES = Set.of("image/jpeg", "image/png", "image/webp", "image/gif");
     private static final DateTimeFormatter DATE_DIR = DateTimeFormatter.ofPattern("yyyyMMdd");
     private final Path clueUploadRoot = Path.of("uploads", "clues").toAbsolutePath().normalize();
+    private final Path noticeUploadRoot = Path.of("uploads", "notices").toAbsolutePath().normalize();
 
     @PostMapping("/api/uploads/clues")
     public ApiResponse<UploadResult> uploadCluePhoto(@RequestPart("file") MultipartFile file) {
+        return uploadImage(file, clueUploadRoot, "/uploads/clues/");
+    }
+
+    @PostMapping("/api/uploads/notices")
+    @RequireRole(Role.ADMIN)
+    public ApiResponse<UploadResult> uploadNoticeImage(@RequestPart("file") MultipartFile file) {
+        return uploadImage(file, noticeUploadRoot, "/uploads/notices/");
+    }
+
+    private ApiResponse<UploadResult> uploadImage(MultipartFile file, Path root, String urlPrefix) {
         if (file == null || file.isEmpty()) {
             throw new BusinessException("请选择要上传的照片");
         }
@@ -39,9 +52,9 @@ public class UploadController {
         String dateDir = LocalDateTime.now().format(DATE_DIR);
         String extension = extensionFor(contentType);
         String storedName = UUID.randomUUID().toString().replace("-", "") + extension;
-        Path targetDir = clueUploadRoot.resolve(dateDir).normalize();
+        Path targetDir = root.resolve(dateDir).normalize();
         Path target = targetDir.resolve(storedName).normalize();
-        if (!target.startsWith(clueUploadRoot)) {
+        if (!target.startsWith(root)) {
             throw new BusinessException("上传路径非法");
         }
         try {
@@ -50,7 +63,7 @@ public class UploadController {
         } catch (IOException error) {
             throw new BusinessException("照片保存失败，请稍后重试");
         }
-        String url = "/uploads/clues/" + dateDir + "/" + storedName;
+        String url = urlPrefix + dateDir + "/" + storedName;
         return ApiResponse.created(new UploadResult(url, cleanName(file.getOriginalFilename()), file.getSize()));
     }
 

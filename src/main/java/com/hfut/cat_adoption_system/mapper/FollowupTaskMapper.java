@@ -130,6 +130,9 @@ public interface FollowupTaskMapper {
             @Arg(column = "abnormal_flag", javaType = Boolean.class),
             @Arg(column = "abnormal_desc", javaType = String.class),
             @Arg(column = "volunteer_comment", javaType = String.class),
+            @Arg(column = "submitter_id", javaType = String.class),
+            @Arg(column = "submitter_name", javaType = String.class),
+            @Arg(column = "submitter_role", javaType = String.class),
             @Arg(column = "submit_time", javaType = LocalDateTime.class)
     })
     @Select("""
@@ -139,14 +142,59 @@ public interface FollowupTaskMapper {
                    fr.environment_description AS environment_desc,
                    photo_url, abnormal_flag,
                    fr.abnormal_description AS abnormal_desc,
-                   volunteer_comment, submit_time
+                   volunteer_comment,
+                   fr.create_by AS submitter_id,
+                   ru.user_name AS submitter_name,
+                   ru.role_code AS submitter_role,
+                   submit_time
             FROM followup_record fr
             JOIN followup_task ft ON ft.id = fr.task_id
             JOIN t_application a ON a.application_id = ft.application_id
+            LEFT JOIN t_user ru ON ru.user_id = fr.create_by
             WHERE fr.task_id = #{taskId} AND COALESCE(fr.deleted, 0) = 0
             ORDER BY fr.id DESC LIMIT 1
             """)
     FollowupRecordInfo findRecordByTaskId(Long taskId);
+
+    @ConstructorArgs({
+            @Arg(column = "id", javaType = Long.class),
+            @Arg(column = "task_id", javaType = Long.class),
+            @Arg(column = "application_id", javaType = String.class),
+            @Arg(column = "agreement_id", javaType = Long.class),
+            @Arg(column = "cat_id", javaType = String.class),
+            @Arg(column = "adopter_id", javaType = String.class),
+            @Arg(column = "content", javaType = String.class),
+            @Arg(column = "cat_condition", javaType = String.class),
+            @Arg(column = "environment_desc", javaType = String.class),
+            @Arg(column = "photo_url", javaType = String.class),
+            @Arg(column = "abnormal_flag", javaType = Boolean.class),
+            @Arg(column = "abnormal_desc", javaType = String.class),
+            @Arg(column = "volunteer_comment", javaType = String.class),
+            @Arg(column = "submitter_id", javaType = String.class),
+            @Arg(column = "submitter_name", javaType = String.class),
+            @Arg(column = "submitter_role", javaType = String.class),
+            @Arg(column = "submit_time", javaType = LocalDateTime.class)
+    })
+    @Select("""
+            SELECT fr.id, fr.task_id, ft.application_id, ft.agreement_id, a.cat_id,
+                   a.user_id AS adopter_id,
+                   fr.content, fr.cat_condition,
+                   fr.environment_description AS environment_desc,
+                   fr.photo_url, fr.abnormal_flag,
+                   fr.abnormal_description AS abnormal_desc,
+                   fr.volunteer_comment,
+                   fr.create_by AS submitter_id,
+                   ru.user_name AS submitter_name,
+                   ru.role_code AS submitter_role,
+                   fr.submit_time
+            FROM followup_record fr
+            JOIN followup_task ft ON ft.id = fr.task_id
+            JOIN t_application a ON a.application_id = ft.application_id
+            LEFT JOIN t_user ru ON ru.user_id = fr.create_by
+            WHERE fr.task_id = #{taskId} AND COALESCE(fr.deleted, 0) = 0
+            ORDER BY fr.submit_time DESC, fr.id DESC
+            """)
+    List<FollowupRecordInfo> findRecordsByTaskId(Long taskId);
 
     @ConstructorArgs({
             @Arg(column = "id", javaType = Long.class),
@@ -189,7 +237,7 @@ public interface FollowupTaskMapper {
                    ft.task_type,
                    ft.status, ft.abnormal_flag, ft.handler_id, hu.user_name AS handler_name,
                    ft.create_time,
-                   CASE WHEN ft.status IN ('PENDING', 'OVERDUE') AND fr.id IS NULL THEN 1 ELSE 0 END AS feedback_enabled,
+                   CASE WHEN ft.status IN ('PENDING', 'OVERDUE', 'ABNORMAL') THEN 1 ELSE 0 END AS feedback_enabled,
                    fr.id AS record_id, fr.content AS record_content, fr.cat_condition,
                    fr.environment_description AS environment_desc,
                    fr.photo_url, fr.abnormal_flag AS record_abnormal_flag,
@@ -202,7 +250,13 @@ public interface FollowupTaskMapper {
             JOIN t_user u ON u.user_id = a.user_id
             LEFT JOIN adoption_agreement ag ON ag.id = ft.agreement_id
             LEFT JOIN t_user hu ON hu.user_id = ft.handler_id
-            LEFT JOIN followup_record fr ON fr.task_id = ft.id AND COALESCE(fr.deleted, 0) = 0
+            LEFT JOIN followup_record fr ON fr.id = (
+                SELECT fr2.id
+                FROM followup_record fr2
+                WHERE fr2.task_id = ft.id AND COALESCE(fr2.deleted, 0) = 0
+                ORDER BY fr2.submit_time DESC, fr2.id DESC
+                LIMIT 1
+            )
             WHERE COALESCE(ft.deleted, 0) = 0
             <if test="id != null">AND ft.id = #{id}</if>
             <if test="adopterId != null and adopterId != ''">AND a.user_id = #{adopterId}</if>

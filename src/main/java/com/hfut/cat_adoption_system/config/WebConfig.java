@@ -27,5 +27,8 @@ public class WebConfig implements WebMvcConfigurer {
         String clueUploadLocation = Path.of("uploads", "clues").toAbsolutePath().normalize().toUri().toString();
         registry.addResourceHandler("/uploads/clues/**")
                 .addResourceLocations(clueUploadLocation);
+        String noticeUploadLocation = Path.of("uploads", "notices").toAbsolutePath().normalize().toUri().toString();
+        registry.addResourceHandler("/uploads/notices/**")
+                .addResourceLocations(noticeUploadLocation);
     }
 }

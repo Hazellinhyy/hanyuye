@@ -9,6 +9,8 @@ public record Notice(
         String publisher,
         boolean pinned,
         boolean enabled,
-        LocalDateTime publishedAt
+        LocalDateTime publishedAt,
+        String imageUrl,
+        String targetRoles
 ) {
 }

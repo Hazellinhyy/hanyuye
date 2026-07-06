@@ -43,6 +43,7 @@ public class ApplicationController {
     }
 
     @PostMapping
+    @RequireRole(Role.STUDENT)
     public ApiResponse<AdoptionApplication> submitApplication(@Valid @RequestBody ApplicationRequest request) {
         return ApiResponse.created(service.submitApplication(request));
     }

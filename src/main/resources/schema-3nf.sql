@@ -268,7 +268,7 @@ CREATE TABLE followup_record (
     CONSTRAINT fk_followup_record_task FOREIGN KEY (task_id) REFERENCES followup_task(id),
     CONSTRAINT fk_followup_record_create_by FOREIGN KEY (create_by) REFERENCES t_user(user_id),
     CONSTRAINT fk_followup_record_update_by FOREIGN KEY (update_by) REFERENCES t_user(user_id),
-    UNIQUE KEY uk_followup_record_task_active (task_id, deleted)
+    INDEX idx_followup_record_task_active (task_id, deleted)
 );
 
 CREATE TABLE warning_record (
@@ -310,6 +310,8 @@ CREATE TABLE t_notice (
     publish_time DATETIME,
     pinned TINYINT(1) NOT NULL DEFAULT 0,
     sort_order INT NOT NULL DEFAULT 0,
+    image_url VARCHAR(255),
+    target_roles VARCHAR(120) NOT NULL DEFAULT 'STUDENT,VOLUNTEER,HOSPITAL,ADMIN',
     deleted TINYINT(1) NOT NULL DEFAULT 0,
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

@@ -17,7 +17,7 @@ import java.util.List;
 public interface MedicalRecordMapper {
     @Select("""
             <script>
-            SELECT medical_id, cat_id, check_date, hospital, health_level, vaccinated, sterilized, treatment, doctor_note, created_at
+            SELECT medical_id, cat_id, check_date, hospital, health_level, vaccinated, sterilized, treatment, doctor_note, attachment_url, created_at
             FROM t_medical_record
             WHERE 1 = 1
             AND COALESCE(deleted, 0) = 0
@@ -29,7 +29,7 @@ public interface MedicalRecordMapper {
 
     @Select("""
             <script>
-            SELECT medical_id, cat_id, check_date, hospital, health_level, vaccinated, sterilized, treatment, doctor_note, created_at
+            SELECT medical_id, cat_id, check_date, hospital, health_level, vaccinated, sterilized, treatment, doctor_note, attachment_url, created_at
             FROM t_medical_record
             WHERE COALESCE(deleted, 0) = 0
             <if test="hospitalUserId != null and hospitalUserId != ''">AND hospital_user_id = #{hospitalUserId}</if>
@@ -107,7 +107,7 @@ public interface MedicalRecordMapper {
                    @Param("updatedAt") LocalDateTime updatedAt);
 
     @Select("""
-            SELECT medical_id, cat_id, check_date, hospital, health_level, vaccinated, sterilized, treatment, doctor_note, created_at
+            SELECT medical_id, cat_id, check_date, hospital, health_level, vaccinated, sterilized, treatment, doctor_note, attachment_url, created_at
             FROM t_medical_record
             WHERE medical_id = #{medicalId} AND COALESCE(deleted, 0) = 0
             """)

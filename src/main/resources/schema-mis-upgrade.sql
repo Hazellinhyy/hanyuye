@@ -321,7 +321,7 @@ CREATE INDEX idx_warning_biz ON warning_record (biz_type, biz_id);
 CREATE INDEX idx_warning_user_status ON warning_record (user_id, handle_status);
 CREATE INDEX idx_warning_task_type_status ON warning_record (task_id, warning_type, handle_status);
 
-CREATE UNIQUE INDEX uk_followup_record_task_active ON followup_record (task_id, deleted);
+CREATE INDEX idx_followup_record_task_active ON followup_record (task_id, deleted);
 
 -- Stage 7: system management, messages, notices, dicts and dashboard support.
 ALTER TABLE system_message ADD COLUMN receiver_id VARCHAR(12);
@@ -334,6 +334,8 @@ ALTER TABLE t_notice ADD COLUMN publish_status VARCHAR(30) NOT NULL DEFAULT 'PUB
 ALTER TABLE t_notice ADD COLUMN publisher_id VARCHAR(12);
 ALTER TABLE t_notice ADD COLUMN publish_time DATETIME;
 ALTER TABLE t_notice ADD COLUMN sort_order INT NOT NULL DEFAULT 0;
+ALTER TABLE t_notice ADD COLUMN image_url VARCHAR(255);
+ALTER TABLE t_notice ADD COLUMN target_roles VARCHAR(120) NOT NULL DEFAULT 'STUDENT,VOLUNTEER,HOSPITAL,ADMIN';
 ALTER TABLE t_notice ADD COLUMN deleted TINYINT(1) NOT NULL DEFAULT 0;
 ALTER TABLE t_notice ADD COLUMN create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP;
 ALTER TABLE t_notice ADD COLUMN update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;

@@ -117,8 +117,11 @@
         { path: "#/my/applications", label: "我的申请", title: "我的申请", text: "查看认养申请状态、审核意见和协议交接信息。" },
         { path: "#/my/followups", label: "我的回访", title: "我的回访", text: "查看待回访任务并提交回访反馈。" },
         { path: "#/my/messages", label: "我的消息", title: "我的消息", text: "查看系统通知、审核结果、协议和回访提醒。" },
+        { path: "#/volunteer/clues", label: "线索审核", roles: ["VOLUNTEER"], title: "线索审核", text: "志愿者核实普通用户提交的猫咪线索，确认有效、无效或生成猫咪档案。" },
+        { path: "#/volunteer/followups", label: "回访任务", roles: ["VOLUNTEER"], title: "回访任务", text: "志愿者查看全部回访任务，填写回访记录并跟进异常情况。" },
+        { path: "#/admin-notices", label: "公告发布", roles: ["ADMIN"], title: "公告发布", text: "管理员在前台编辑公告、发布或下架公告。" },
         { path: "#/hospital", label: "医疗协作", roles: ["HOSPITAL"], title: "医疗协作门户", text: "合作医院查看待医疗猫咪、最近医疗记录和后台入口。" },
-        { path: "#/profile", label: "个人中心", title: "个人中心", text: "维护个人资料，汇总线索、申请、回访和消息。" },
+        { path: "#/profile", label: "个人中心", title: "个人中心", text: "维护个人资料，查看申请、回访、消息和对应后台入口。" },
         { path: "#/login", label: "登录", title: "登录", text: "使用统一账号进入前台或后台。" },
         { path: "#/register", label: "注册", title: "注册", text: "创建普通用户账号，提交线索和认养申请。" }
     ];
@@ -297,7 +300,7 @@
                 ]
             }
         }[kind];
-        return meta;
+        return { ...meta, image: notice?.imageUrl || meta.image };
     }
 
     function noticeTitle(notice) {
@@ -397,18 +400,15 @@
                     <div>
                         <p class="eyebrow">志愿者</p>
                         <h2>${escapeHtml(user.userName)}，志愿者协同待办</h2>
-                        <p>待核实线索 ${summary.pendingClueCount ?? "-"}，待初审申请 ${summary.pendingInitialApplicationCount ?? "-"}，后台待回访任务 ${summary.pendingFollowupTaskCount ?? "-"}。${pendingTasks ? ` 你作为认养人还有 ${pendingTasks} 个系统生成的待回访任务。` : ""}${unread ? ` 未读消息 ${unread} 条。` : ""}</p>
+                        <p>待核实线索 ${summary.pendingClueCount ?? "-"}，待初审申请 ${summary.pendingInitialApplicationCount ?? "-"}，后台待回访任务 ${summary.pendingFollowupTaskCount ?? "-"}。${unread ? ` 未读消息 ${unread} 条。` : ""}</p>
                     </div>
                     <div class="role-actions">
                         <a class="primary-btn" href="#/admin/dashboard">进入志愿者工作台</a>
-                        <a class="ghost-btn" href="#/cats">我要认养</a>
-                        <a class="ghost-btn" href="#/my/applications">我的申请</a>
-                        <a class="ghost-btn" href="#/my/followups">我的回访${pendingTasks ? `(${pendingTasks})` : ""}</a>
-                        <a class="ghost-btn" href="#/my/messages">我的消息${unread ? `(${unread})` : ""}</a>
-                        <a class="ghost-btn" href="#/admin/clues">待核实线索</a>
-                        <a class="ghost-btn" href="#/admin/cats">猫咪档案管理</a>
+                        <a class="ghost-btn" href="#/volunteer/clues">线索审核</a>
+                        <a class="ghost-btn" href="#/volunteer/followups">回访任务</a>
                         <a class="ghost-btn" href="#/admin/adoption/audits">认养初审</a>
-                        <a class="ghost-btn" href="#/admin/followups">后台回访任务</a>
+                        <a class="ghost-btn" href="#/admin/cats">猫咪档案管理</a>
+                        <a class="ghost-btn" href="#/my/messages">我的消息${unread ? `(${unread})` : ""}</a>
                     </div>
                 </section>
             `;
@@ -427,6 +427,7 @@
                         <a class="ghost-btn" href="#/admin/medical">待医疗猫咪</a>
                         <a class="ghost-btn" href="#/admin/medical">医疗记录管理</a>
                         <a class="ghost-btn" href="#/admin/medical">健康异常记录</a>
+                        <a class="ghost-btn" href="#/profile">个人中心</a>
                     </div>
                 </section>
             `;
@@ -443,7 +444,7 @@
                     <a class="ghost-btn" href="#/admin/dashboard">Dashboard</a>
                     <a class="ghost-btn" href="#/admin/warnings">待处理预警</a>
                     <a class="ghost-btn" href="#/admin/users">用户管理</a>
-                    <a class="ghost-btn" href="#/admin/notices">公告管理</a>
+                    <a class="ghost-btn" href="#/admin-notices">公告发布</a>
                     <a class="ghost-btn" href="#/admin/logs">操作日志</a>
                 </div>
             </section>
@@ -460,14 +461,14 @@
         const payload = await response.json().catch(() => ({ success: false, message: "接口返回异常" }));
         if (response.status === 401) {
             clearAuth();
-                    throw new Error("Agent is temporarily unavailable. Please try again later.");
+            throw new Error(payload.message || "登录已过期，请重新登录。");
         }
         if (response.status === 403) {
             window.location.hash = "#/403";
-                    throw new Error("Agent is temporarily unavailable. Please try again later.");
+            throw new Error(payload.message || "当前账号无权执行此操作。");
         }
         if (!response.ok || !payload.success) {
-                    throw new Error("Agent is temporarily unavailable. Please try again later.");
+            throw new Error(payload.message || "操作失败，请稍后重试。");
         }
         return payload.data;
     }
@@ -491,7 +492,7 @@
         const message = checks.find(Boolean);
         if (message) {
             if (messageEl) messageEl.textContent = message;
-                    throw new Error("Agent is temporarily unavailable. Please try again later.");
+            throw new Error(message);
         }
     }
 
@@ -505,7 +506,7 @@
     }
 
     async function downloadCsv(path, filename) {
-        const headers = {};
+        const headers = { Accept: "text/csv,application/octet-stream,*/*" };
         const authToken = token();
         if (authToken) {
             headers.Authorization = `Bearer ${authToken}`;
@@ -514,15 +515,31 @@
         if (!response.ok) {
             let message = "导出失败，请稍后重试";
             try {
-                const payload = await response.json();
-                message = payload.message || message;
-                history[history.length - 1] = { role: "assistant", content: thinking.textContent };
+                const contentType = response.headers.get("content-type") || "";
+                if (contentType.includes("application/json")) {
+                    const payload = await response.json();
+                    message = payload.message || message;
+                } else {
+                    const text = await response.text();
+                    message = text || message;
+                }
             } catch (error) {
-                // Keep the friendly fallback message.
+                // Keep the fallback message.
             }
-                    throw new Error("Agent is temporarily unavailable. Please try again later.");
+            if (response.status === 401) {
+                clearAuth();
+                window.location.hash = loginHashFor(window.location.hash || "#/");
+                throw new Error("登录已过期，请重新登录后再导出。");
+            }
+            if (response.status === 403) {
+                throw new Error("当前账号没有导出权限，请使用管理员账号。");
+            }
+            throw new Error(message);
         }
         const blob = await response.blob();
+        if (!blob.size) {
+            throw new Error("导出文件为空，请稍后重试。");
+        }
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
@@ -667,7 +684,21 @@
     }
 
     function canVisit(route, role) {
-        return !route.roles || route.roles.includes(normalizeRole(role));
+        const normalizedRole = normalizeRole(role);
+        if (normalizedRole !== "STUDENT" && [
+            "#/clues/submit",
+            "#/my/clues",
+            "#/my/applications",
+            "#/my/followups",
+            "#/adoption/apply/:catId"
+        ].includes(route?.path)) {
+            return false;
+        }
+        return !route.roles || route.roles.includes(normalizedRole);
+    }
+
+    function canUseFrontSelfService(user) {
+        return !user || normalizeRole(user.role) === "STUDENT";
     }
 
     function isPrivateFrontRoute(route) {
@@ -677,7 +708,7 @@
     function userNav(activePath, user) {
         return userRoutes.filter(route => !["#/login", "#/register"].includes(route.path))
             .filter(route => user || !privateFrontRoutePaths.has(route.path))
-            .filter(route => !route.roles || (user && canVisit(route, normalizeRole(user.role)))).map(route => `
+            .filter(route => route.roles ? (user && canVisit(route, user.role)) : (!user || canVisit(route, user.role))).map(route => `
             <a class="${activePath === route.path ? "active" : ""}" href="${route.path}">${route.label}</a>
         `).join("");
     }
@@ -720,7 +751,7 @@
 
     function canSubmitAdoptionApplication(user) {
         const role = normalizeRole(user?.role);
-        return role === "STUDENT" || role === "VOLUNTEER";
+        return role === "STUDENT";
     }
 
     function adoptionAction(cat, user) {
@@ -836,7 +867,7 @@
         }
         const role = normalizeRole(user?.role);
         shell.innerHTML = `
-            <div class="mis-user-layout">
+            <div class="mis-user-layout user-center-shell">
                 <header class="mis-user-header">
                     <a class="mis-brand" href="#/"><span>HFUT</span><strong>校园流浪猫认养门户</strong></a>
                     <nav>${userNav(route.path, user)}</nav>
@@ -1006,39 +1037,29 @@
         const label = select.closest("label");
         const saveButton = label?.querySelector("[data-save-custom]");
         const customOption = [...select.options].find(option => option.value === "__custom__");
-        const optionList = document.createElement("div");
-        optionList.className = "clue-option-list";
-        select.insertAdjacentElement("afterend", optionList);
-        const renderOptions = () => {
-            optionList.innerHTML = "";
-            [...select.options]
-                .filter(option => option.value && option.value !== "__custom__")
-                .forEach(option => {
-                    const item = document.createElement("span");
-                    item.className = "clue-option-item";
-                    item.textContent = option.textContent;
-                    const remove = document.createElement("button");
-                    remove.type = "button";
-                    remove.className = "clue-option-remove";
-                    remove.setAttribute("aria-label", `删除${option.textContent}`);
-                    remove.textContent = "\u00d7";
-                    remove.addEventListener("click", () => {
-                        if (!window.confirm(`确定删除“${option.textContent}”这个选项吗？`)) return;
-                        const removedValue = option.value;
-                        option.remove();
-                        if (select.value === removedValue || input.value === removedValue) {
-                            select.value = "";
-                            input.value = "";
-                        }
-                        renderOptions();
-                    });
-                    item.appendChild(remove);
-                    optionList.appendChild(item);
-                });
+        const selectRow = document.createElement("div");
+        selectRow.className = "clue-select-row";
+        select.insertAdjacentElement("beforebegin", selectRow);
+        selectRow.appendChild(select);
+        const deleteButton = document.createElement("button");
+        deleteButton.type = "button";
+        deleteButton.className = "clue-select-delete";
+        deleteButton.textContent = "\u00d7";
+        deleteButton.setAttribute("aria-label", "删除当前选项");
+        selectRow.appendChild(deleteButton);
+
+        const getSelectedOption = () => [...select.options].find(option => option.selected);
+        const updateDeleteButton = () => {
+            const option = getSelectedOption();
+            const canDelete = Boolean(option?.value && option.value !== "__custom__");
+            deleteButton.classList.toggle("is-visible", canDelete);
+            deleteButton.disabled = !canDelete;
+            deleteButton.title = canDelete ? `删除“${option.textContent}”` : "请先选择要删除的选项";
         };
         const setCustomMode = active => {
             input.classList.toggle("is-visible", active);
             saveButton?.classList.toggle("is-visible", active);
+            updateDeleteButton();
             if (active) {
                 input.value = "";
                 input.focus();
@@ -1052,6 +1073,17 @@
             input.value = select.value;
             setCustomMode(false);
         });
+        deleteButton.addEventListener("click", () => {
+            const option = getSelectedOption();
+            if (!option?.value || option.value === "__custom__") return;
+            if (!window.confirm(`确定删除“${option.textContent}”这个选项吗？`)) return;
+            const removedValue = option.value;
+            option.remove();
+            if (input.value === removedValue) input.value = "";
+            select.value = "";
+            setCustomMode(false);
+            updateDeleteButton();
+        });
         const saveCustom = () => {
             const value = input.value.trim();
             if (!value || !customOption) return;
@@ -1064,8 +1096,8 @@
             }
             select.value = value;
             input.value = value;
-            renderOptions();
             setCustomMode(false);
+            updateDeleteButton();
         };
         saveButton?.addEventListener("click", saveCustom);
         input.addEventListener("keydown", event => {
@@ -1073,8 +1105,8 @@
             event.preventDefault();
             saveCustom();
         });
-        renderOptions();
         setCustomMode(false);
+        updateDeleteButton();
     }
 
     function renderClueSubmit(route, user) {
@@ -1531,6 +1563,21 @@
         </tr>`).join("") || `<tr><td colspan="6"><div class="mis-empty">${escapeHtml(emptyText)}</div></td></tr>`;
     }
 
+    function hospitalCatRow(cat, tone) {
+        const statusText = catStatusLabels[cat.status]?.label || cat.status || "-";
+        const healthText = healthLabels[cat.healthLevel]?.label || cat.healthLevel || "-";
+        return `
+            <article class="hospital-cat-row ${tone === "observe" ? "observe" : ""}">
+                <img ${imageAttrs(cat.coverUrl, "hospital-cat-thumb", "猫咪照片")}>
+                <div>
+                    <strong>${escapeHtml(cat.catName || "待命名")} <small>${escapeHtml(cat.catId)}</small></strong>
+                    <span>${escapeHtml(cat.foundPlace || "地点待补充")} · ${escapeHtml(healthText)} · ${escapeHtml(statusText)}</span>
+                </div>
+                <a class="ghost-btn compact" href="#/admin/medical?catId=${escapeHtml(cat.catId)}">处理</a>
+            </article>
+        `;
+    }
+
     async function renderHospitalPortal(route, user) {
         userShell(route, user, `${pageHero(route)}<section class="mis-table-panel"><div class="mis-loading">正在加载医疗协作数据...</div></section>`);
         const panel = shell.querySelector(".mis-table-panel");
@@ -1549,11 +1596,12 @@
                     { label: "本院录入记录", value: summary.myRecordCount }
                 ], "business-summary")}
                 <div class="mis-section-head"><h2>医院协作入口</h2><span>${escapeHtml(user.college || "合作医院")} · ${escapeHtml(user.userName)}</span></div>
-                <div class="role-actions">
+                <div class="hospital-entry-actions">
                     <a class="primary-btn" href="#/admin/hospital">进入医院后台首页</a>
                     <a class="ghost-btn" href="#/admin/medical">维护医疗记录</a>
                     <a class="ghost-btn" href="#/admin/medical?status=MEDICAL">处理医疗中猫咪</a>
                     <a class="ghost-btn" href="#/admin/medical?status=OBSERVING">查看观察中猫咪</a>
+                    <a class="ghost-btn" href="#/profile">个人中心</a>
                 </div>
                 <h3>待医疗猫咪</h3>
                 <div class="mis-cat-grid showcase">
@@ -1572,11 +1620,8 @@
     }
 
     async function renderAdminDashboard(route, user) {
-        adminShell(route, user, `${adminHero(route)}<section class="mis-stat-grid"><div class="mis-loading">正在加载统计...</div></section>`);
-        const grid = shell.querySelector(".mis-stat-grid");
-        let distribution;
-        grid.insertAdjacentHTML("afterend", `<section class="mis-table-panel" id="dashboard-distribution"><div class="mis-loading">Loading distribution...</div></section>`);
-        distribution = document.getElementById("dashboard-distribution");
+        adminShell(route, user, `${adminHero(route)}<section class="admin-home"><div class="mis-loading">正在加载后台首页...</div></section>`);
+        const grid = shell.querySelector(".admin-home");
         try {
             const [summary, catStatus, applicationStatus, followupStatus, warningType] = await Promise.all([
                 api("/api/admin/dashboard/summary"),
@@ -1586,43 +1631,72 @@
                 api("/api/admin/dashboard/warning-type")
             ]);
             grid.innerHTML = `
-                <article><span>猫咪总数</span><strong>${summary.catCount}</strong></article>
-                <article><span>可认养数量</span><strong>${summary.adoptableCount}</strong></article>
-                <article><span>观察中数量</span><strong>${summary.observingCount}</strong></article>
-                <article><span>医疗中数量</span><strong>${summary.medicalCount}</strong></article>
-                <article><span>暂停认养数量</span><strong>${summary.suspendedCount}</strong></article>
-                <article><span>待核实线索</span><strong>${summary.pendingClueCount}</strong></article>
-                <article><span>已建档线索</span><strong>${summary.createdCatClueCount}</strong></article>
-                <article><span>待初审申请</span><strong>${summary.pendingInitialApplicationCount}</strong></article>
-                <article><span>待终审申请</span><strong>${summary.pendingFinalApplicationCount}</strong></article>
-                <article><span>待交接申请</span><strong>${summary.pendingHandoverApplicationCount}</strong></article>
-                <article><span>已交接申请</span><strong>${summary.handedOverApplicationCount}</strong></article>
-                <article><span>待回访任务</span><strong>${summary.pendingFollowupTaskCount}</strong></article>
-                <article><span>已完成回访</span><strong>${summary.completedFollowupTaskCount}</strong></article>
-                <article><span>逾期回访</span><strong>${summary.overdueFollowupTaskCount}</strong></article>
-                <article><span>异常回访</span><strong>${summary.abnormalFollowupTaskCount}</strong></article>
-                <article><span>待处理预警</span><strong>${summary.pendingWarningCount}</strong></article>
-                <article><span>已处理预警</span><strong>${summary.handledWarningCount}</strong></article>
-                <article><span>回访完成率</span><strong>${summary.followupCompletionRate}%</strong></article>
-                <article><span>回访中猫咪</span><strong>${summary.followingCatCount}</strong></article>
-                <article><span>高风险申请</span><strong>${summary.highRiskApplicationCount}</strong></article>
-                <article><span>未读消息</span><strong>${summary.unreadMessageCount || 0}</strong></article>
-            `;
-            distribution.innerHTML = `
-                <div class="mis-section-head"><h2>业务分布</h2><span>按状态聚合的中期验收指标</span></div>
-                <div class="mis-placeholder-grid">
-                    ${distributionCard("猫咪状态", catStatus)}
-                    ${distributionCard("申请状态", applicationStatus)}
-                    ${distributionCard("回访状态", followupStatus)}
-                    ${distributionCard("预警类型", warningType)}
+                <div class="admin-home-hero">
+                    <div>
+                        <p class="eyebrow">${user.role === "ADMIN" ? "ADMIN CONSOLE" : "VOLUNTEER WORKBENCH"}</p>
+                        <h2>${escapeHtml(user.userName || "管理员")}，今天的后台待办已汇总</h2>
+                        <span>围绕线索核实、猫咪档案、认养审核、协议交接、回访预警组织工作，优先处理有风险或即将逾期的事项。</span>
+                    </div>
+                    <div class="admin-home-actions">
+                        <a class="primary-btn" href="#/admin/clues">处理线索</a>
+                        <a class="ghost-btn" href="#/admin/adoption/audits">认养审核</a>
+                        <a class="ghost-btn" href="#/admin/followups">回访任务</a>
+                        ${user.role === "ADMIN" ? `<a class="ghost-btn" href="#/admin/system/users">用户管理</a>` : ""}
+                    </div>
                 </div>
+                <div class="admin-home-kpis">
+                    ${[
+                        { label: "猫咪总数", value: summary.catCount, hint: `可认养 ${summary.adoptableCount || 0}` },
+                        { label: "待核实线索", value: summary.pendingClueCount, hint: `已建档 ${summary.createdCatClueCount || 0}` },
+                        { label: "待审核申请", value: (summary.pendingInitialApplicationCount || 0) + (summary.pendingFinalApplicationCount || 0), hint: `高风险 ${summary.highRiskApplicationCount || 0}` },
+                        { label: "待交接", value: summary.pendingHandoverApplicationCount, hint: `已交接 ${summary.handedOverApplicationCount || 0}` },
+                        { label: "待回访", value: summary.pendingFollowupTaskCount, hint: `完成率 ${summary.followupCompletionRate || 0}%` },
+                        { label: "待处理预警", value: summary.pendingWarningCount, hint: `已处理 ${summary.handledWarningCount || 0}` }
+                    ].map(item => `<article><span>${escapeHtml(item.label)}</span><strong>${escapeHtml(item.value ?? 0)}</strong><small>${escapeHtml(item.hint)}</small></article>`).join("")}
+                </div>
+                <div class="admin-home-grid">
+                    <section class="admin-work-card priority">
+                        <div class="mis-section-head"><h2>优先待办</h2><span>按风险和流程阻塞排序</span></div>
+                        <div class="admin-task-list">
+                            ${dashboardTask("线索核实", summary.pendingClueCount, "待现场确认与建档", "#/admin/clues")}
+                            ${dashboardTask("认养初审/终审", (summary.pendingInitialApplicationCount || 0) + (summary.pendingFinalApplicationCount || 0), "审核材料与风险评分", "#/admin/adoption/audits")}
+                            ${dashboardTask("协议交接", summary.pendingHandoverApplicationCount, "确认协议和交接信息", "#/admin/agreements")}
+                            ${dashboardTask("逾期/异常回访", (summary.overdueFollowupTaskCount || 0) + (summary.abnormalFollowupTaskCount || 0), "需要联系认养人跟进", "#/admin/followups")}
+                            ${dashboardTask("异常预警", summary.pendingWarningCount, "需要处理或关闭预警", "#/admin/warnings")}
+                        </div>
+                    </section>
+                    <section class="admin-work-card">
+                        <div class="mis-section-head"><h2>猫咪状态</h2><span>救助与认养库存</span></div>
+                        <div class="admin-status-list">
+                            ${dashboardStatusLine("可认养", summary.adoptableCount)}
+                            ${dashboardStatusLine("观察中", summary.observingCount)}
+                            ${dashboardStatusLine("医疗中", summary.medicalCount)}
+                            ${dashboardStatusLine("回访中", summary.followingCatCount)}
+                            ${dashboardStatusLine("暂停认养", summary.suspendedCount)}
+                        </div>
+                    </section>
+                </div>
+                <section class="admin-distribution-panel">
+                    <div class="mis-section-head"><h2>业务分布</h2><span>按状态聚合的后台指标</span></div>
+                    <div class="admin-distribution-grid">
+                        ${distributionCard("猫咪状态", catStatus)}
+                        ${distributionCard("申请状态", applicationStatus)}
+                        ${distributionCard("回访状态", followupStatus)}
+                        ${distributionCard("预警类型", warningType)}
+                    </div>
+                </section>
             `;
         } catch (error) {
             grid.innerHTML = `<div class="mis-error">${escapeHtml(error.message)}</div>`;
-            if (distribution) {
-                distribution.innerHTML = "";
-            }
         }
+    }
+
+    function dashboardTask(label, value, hint, href) {
+        return `<a class="admin-task-row" href="${escapeHtml(href)}"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value || 0)}</strong><small>${escapeHtml(hint)}</small></a>`;
+    }
+
+    function dashboardStatusLine(label, value) {
+        return `<div class="admin-status-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value || 0)}</strong></div>`;
     }
 
     function distributionCard(title, rows) {
@@ -1642,7 +1716,13 @@
     }
 
     async function renderAdminClues(route, user) {
-        adminShell(route, user, `${adminHero(route)}<section class="mis-table-panel"><div class="mis-loading">正在加载线索...</div></section>`);
+        const isVolunteerFront = route.path === "#/volunteer/clues";
+        const content = `${isVolunteerFront ? pageHero(route) : adminHero(route)}<section class="mis-table-panel"><div class="mis-loading">正在加载线索...</div></section>`;
+        if (isVolunteerFront) {
+            userShell(route, user, content);
+        } else {
+            adminShell(route, user, content);
+        }
         await loadAdminClues();
     }
 
@@ -1832,6 +1912,7 @@
     async function renderAdminHospital(route, user) {
         adminShell(route, user, `${adminHero(route)}<section class="mis-table-panel"><div class="mis-loading">正在加载医院后台...</div></section>`);
         const panel = shell.querySelector(".mis-table-panel");
+        const hideClueFeatures = isHospitalUser(user);
         try {
             const [summary, medicalCats, observingCats, records] = await Promise.all([
                 api("/api/admin/hospital/summary"),
@@ -1840,31 +1921,142 @@
                 api("/api/admin/hospital/records?limit=12").catch(() => [])
             ]);
             panel.innerHTML = `
-                ${summaryCards([
-                    { label: "医疗中猫咪", value: summary.medicalCatCount },
-                    { label: "观察中猫咪", value: summary.observingCatCount },
-                    { label: "异常医疗记录", value: summary.abnormalRecordCount },
-                    { label: "本院录入记录", value: summary.myRecordCount },
-                    { label: "待疫苗猫咪", value: summary.pendingVaccineCount },
-                    { label: "待绝育猫咪", value: summary.pendingSterilizationCount }
-                ], "business-summary")}
-                <div class="mis-filter-row">
-                    <a class="primary-btn" href="#/admin/medical?status=MEDICAL">处理医疗中猫咪</a>
-                    <a class="ghost-btn" href="#/admin/medical?status=OBSERVING">查看观察中猫咪</a>
-                    <a class="ghost-btn" href="#/admin/medical">新增医疗记录</a>
-                    <a class="ghost-btn" href="#/hospital">返回医疗协作前台</a>
-                </div>
-                <div class="mis-placeholder-grid">
-                    <article><strong>待医疗</strong><span>${(medicalCats || []).slice(0, 5).map(cat => `${cat.catName || cat.catId}(${cat.catId})`).join("、") || "暂无医疗中猫咪"}</span></article>
-                    <article><strong>需观察</strong><span>${(observingCats || []).slice(0, 5).map(cat => `${cat.catName || cat.catId}(${cat.catId})`).join("、") || "暂无观察中猫咪"}</span></article>
-                    <article><strong>工作口径</strong><span>体检、疫苗、绝育、治疗记录由医院用户录入；异常记录会联动猫咪进入医疗中状态。</span></article>
-                </div>
-                <h3>最近医疗记录</h3>
-                <div class="mis-table-wrap"><table class="mis-table"><thead><tr><th>编号</th><th>猫咪</th><th>日期</th><th>健康</th><th>说明</th><th>医院</th></tr></thead><tbody>${medicalRecordRows(records)}</tbody></table></div>
+                <section class="hospital-home">
+                    <div class="hospital-home-hero">
+                        <div>
+                            <p class="eyebrow">MEDICAL WORKBENCH</p>
+                            <h2>${escapeHtml(user.college || "合作医院")}医疗协作台</h2>
+                            <span>集中查看医疗中、观察中、异常记录和疫苗绝育待办，优先处理需要医生判断的猫咪。</span>
+                        </div>
+                        <div class="hospital-home-actions">
+                            <a class="primary-btn" href="#/admin/medical?status=MEDICAL">处理医疗中猫咪</a>
+                            <a class="ghost-btn" href="#/admin/medical">新增医疗记录</a>
+                            <a class="ghost-btn" href="#/hospital">返回医疗协作前台</a>
+                        </div>
+                    </div>
+                    <div class="hospital-kpi-grid">
+                        ${[
+                            { label: "医疗中", value: summary.medicalCatCount ?? 0, hint: "需诊疗处理" },
+                            { label: "观察中", value: summary.observingCatCount ?? 0, hint: "需复查关注" },
+                            { label: "异常记录", value: summary.abnormalRecordCount ?? 0, hint: "健康风险" },
+                            { label: "本院记录", value: summary.myRecordCount ?? 0, hint: "已录入" },
+                            { label: "待疫苗", value: summary.pendingVaccineCount ?? 0, hint: "免疫待办" },
+                            { label: "待绝育", value: summary.pendingSterilizationCount ?? 0, hint: "手术待办" }
+                        ].map(item => `<article><span>${escapeHtml(item.label)}</span><strong>${escapeHtml(item.value)}</strong><small>${escapeHtml(item.hint)}</small></article>`).join("")}
+                    </div>
+                    <div class="hospital-home-grid">
+                        <section class="hospital-work-card">
+                            <div class="mis-section-head"><h2>待医疗猫咪</h2><a href="#/admin/medical?status=MEDICAL">查看全部</a></div>
+                            <div class="hospital-cat-list">
+                                ${(medicalCats || []).slice(0, 5).map(cat => hospitalCatRow(cat, "medical")).join("") || `<div class="mis-empty">暂无医疗中猫咪</div>`}
+                            </div>
+                        </section>
+                        <section class="hospital-work-card">
+                            <div class="mis-section-head"><h2>观察中猫咪</h2><a href="#/admin/medical?status=OBSERVING">查看全部</a></div>
+                            <div class="hospital-cat-list">
+                                ${(observingCats || []).slice(0, 5).map(cat => hospitalCatRow(cat, "observe")).join("") || `<div class="mis-empty">暂无观察中猫咪</div>`}
+                            </div>
+                        </section>
+                    </div>
+                    <section class="hospital-record-card">
+                        <div class="mis-section-head"><h2>最近医疗记录</h2><a href="#/admin/medical">维护记录</a></div>
+                        <div class="mis-table-wrap"><table class="mis-table"><thead><tr><th>编号</th><th>猫咪</th><th>日期</th><th>健康</th><th>说明</th><th>医院</th></tr></thead><tbody>${medicalRecordRows(records)}</tbody></table></div>
+                    </section>
+                </section>
             `;
         } catch (error) {
             panel.innerHTML = `<div class="mis-error">${escapeHtml(error.message)}</div>`;
         }
+    }
+
+    function bindMedicalAttachmentUpload() {
+        const form = document.getElementById("medical-form");
+        const fileInput = document.getElementById("medical-attachment-file");
+        const uploadButton = document.getElementById("medical-attachment-upload");
+        const preview = document.getElementById("medical-attachment-preview");
+        const progressBar = document.getElementById("medical-upload-progress-bar");
+        const progressText = document.getElementById("medical-upload-progress-text");
+        const attachmentInput = form?.elements.attachmentUrl;
+        let previewObjectUrl = "";
+        const reset = () => {
+            if (previewObjectUrl) {
+                URL.revokeObjectURL(previewObjectUrl);
+                previewObjectUrl = "";
+            }
+            if (fileInput) fileInput.value = "";
+            if (uploadButton) uploadButton.disabled = true;
+            if (attachmentInput) attachmentInput.value = "";
+            if (preview) preview.src = "/uploads/cats/no-photo.svg";
+            if (progressBar) progressBar.style.width = "0%";
+            if (progressText) progressText.textContent = "可以上传检查、治疗或诊断照片";
+        };
+        const setValue = url => {
+            const value = String(url || "").trim();
+            if (previewObjectUrl) {
+                URL.revokeObjectURL(previewObjectUrl);
+                previewObjectUrl = "";
+            }
+            if (attachmentInput) attachmentInput.value = value;
+            if (preview) preview.src = value || "/uploads/cats/no-photo.svg";
+            if (progressBar) progressBar.style.width = value ? "100%" : "0%";
+            if (progressText) progressText.textContent = value ? "已加载附件图片" : "可以上传检查、治疗或诊断照片";
+            if (uploadButton) uploadButton.disabled = true;
+            if (fileInput) fileInput.value = "";
+        };
+        fileInput?.addEventListener("change", () => {
+            const file = fileInput.files?.[0];
+            if (attachmentInput) attachmentInput.value = "";
+            if (progressBar) progressBar.style.width = "0%";
+            if (progressText) progressText.textContent = file ? "待上传" : "可以上传检查、治疗或诊断照片";
+            if (uploadButton) uploadButton.disabled = !file;
+            if (previewObjectUrl) {
+                URL.revokeObjectURL(previewObjectUrl);
+                previewObjectUrl = "";
+            }
+            if (!file) {
+                if (preview) preview.src = "/uploads/cats/no-photo.svg";
+                return;
+            }
+            if (!file.type.startsWith("image/")) {
+                if (progressText) progressText.textContent = "请选择图片文件";
+                if (uploadButton) uploadButton.disabled = true;
+                if (preview) preview.src = "/uploads/cats/no-photo.svg";
+                return;
+            }
+            previewObjectUrl = URL.createObjectURL(file);
+            if (preview) preview.src = previewObjectUrl;
+        });
+        uploadButton?.addEventListener("click", async () => {
+            const file = fileInput.files?.[0];
+            if (!file) {
+                if (progressText) progressText.textContent = "请先选择图片";
+                return;
+            }
+            if (file.size > 5 * 1024 * 1024) {
+                if (progressText) progressText.textContent = "图片不能超过 5MB";
+                return;
+            }
+            try {
+                uploadButton.disabled = true;
+                if (progressBar) progressBar.style.width = "0%";
+                if (progressText) progressText.textContent = "上传中 0%";
+                const result = await uploadFileWithProgress("/api/uploads/clues", file, percent => {
+                    if (progressBar) progressBar.style.width = `${percent}%`;
+                    if (progressText) progressText.textContent = `上传中 ${percent}%`;
+                });
+                setValue(result.url);
+                if (progressText) progressText.textContent = "上传完成";
+            } catch (error) {
+                if (attachmentInput) attachmentInput.value = "";
+                if (progressText) progressText.textContent = error.message;
+                uploadButton.disabled = false;
+            }
+        });
+        return {
+            reset,
+            setValue,
+            hasPendingFile: () => Boolean(fileInput?.files?.[0] && !attachmentInput?.value)
+        };
     }
 
     async function renderAdminMedical(route, user) {
@@ -1881,53 +2073,105 @@
             }
             const currentCat = selectedCatId || (cats[0] ? cats[0].catId : "");
             const records = currentCat ? await api(`/api/admin/cats/${currentCat}/medical-records`) : [];
+            const selectedCat = cats.find(cat => cat.catId === currentCat);
             panel.innerHTML = `
-                ${summaryCards([
-                    { label: "医疗中猫咪", value: summary.medicalCatCount ?? 0 },
-                    { label: "观察中猫咪", value: summary.observingCatCount ?? 0 },
-                    { label: "异常记录", value: summary.abnormalRecordCount ?? 0 },
-                    { label: "本院记录", value: summary.myRecordCount ?? 0 },
-                    { label: "待疫苗", value: summary.pendingVaccineCount ?? 0 },
-                    { label: "待绝育", value: summary.pendingSterilizationCount ?? 0 }
-                ], "business-summary")}
-                <div class="mis-filter-row">
-                    <select id="medical-status-filter">
-                        <option value="MEDICAL" ${statusFilter === "MEDICAL" ? "selected" : ""}>医疗中猫咪</option>
-                        <option value="OBSERVING" ${statusFilter === "OBSERVING" ? "selected" : ""}>观察中猫咪</option>
-                        <option value="ADOPTABLE" ${statusFilter === "ADOPTABLE" ? "selected" : ""}>可认养猫咪</option>
-                    </select>
-                    ${cats.length ? `<select id="medical-cat-select">${cats.map(cat => `<option value="${cat.catId}" ${currentCat === cat.catId ? "selected" : ""}>${cat.catId} · ${escapeHtml(cat.catName || "待命名")} · ${catStatusLabels[cat.status]?.label || cat.status}</option>`).join("")}</select>` : `<input id="medical-cat-select" value="${escapeHtml(currentCat)}" placeholder="输入猫咪编号，如 CAT260501001">`}
-                    <button class="ghost-btn" id="medical-cat-jump">查看</button>
-                    <a class="ghost-btn" href="#/admin/hospital">医院首页</a>
-                </div>
-                <form class="mis-form" id="medical-form">
-                    <input type="hidden" name="medicalId" value="">
-                    <label>记录类型<select name="recordType"><option value="CHECKUP">体检</option><option value="VACCINE">疫苗</option><option value="STERILIZATION">绝育</option><option value="TREATMENT">治疗</option><option value="OTHER">其他</option></select></label>
-                    <label>记录日期<input name="recordDate" type="date"></label>
-                    <label>健康结果<select name="healthResult"><option value="HEALTHY">健康</option><option value="OBSERVE">需观察</option><option value="SICK">患病</option><option value="SERIOUS">严重异常</option></select></label>
-                    <label>疫苗状态<select name="vaccineStatus"><option value="UNKNOWN">未知</option><option value="NOT_VACCINATED">未疫苗</option><option value="PARTIAL">部分接种</option><option value="VACCINATED">已疫苗</option></select></label>
-                    <label>绝育状态<select name="sterilizedStatus"><option value="UNKNOWN">未知</option><option value="NOT_STERILIZED">未绝育</option><option value="STERILIZED">已绝育</option><option value="NOT_SUITABLE">暂不适合</option></select></label>
-                    <label>费用<input name="cost" type="number" step="0.01"></label>
-                    <label>附件 URL<input name="attachmentUrl" placeholder="/uploads/cats/cat_01_01.jpg"></label>
-                    <label class="wide">医疗说明<textarea name="description" required></textarea></label>
-                    <label class="check"><input name="abnormalFlag" type="checkbox"> 标记异常</label>
-                    <div class="mis-form-actions"><button class="primary-btn" id="medical-submit">新增医疗记录</button><button class="ghost-btn" id="medical-reset" type="button">清空</button><span id="medical-message"></span></div>
-                </form>
-                <h3>当前猫咪医疗记录</h3>
-                <div class="mis-table-wrap"><table class="mis-table"><thead><tr><th>编号</th><th>日期</th><th>健康</th><th>说明</th><th>医院</th><th>操作</th></tr></thead><tbody>
-                    ${(records || []).map(item => `<tr>
-                        <td>${escapeHtml(item.medicalId)}</td>
-                        <td>${escapeHtml(item.checkDate || "-")}</td>
-                        <td>${tag(item.healthLevel, healthLabels)}</td>
-                        <td>${escapeHtml(item.treatment || item.doctorNote || "-")}</td>
-                        <td>${escapeHtml(item.hospital || "-")}</td>
-                        <td>
-                            <button class="ghost-btn" data-medical-edit="${escapeHtml(item.medicalId)}">回填编辑</button>
-                            <button class="ghost-btn" data-medical-void="${escapeHtml(item.medicalId)}">作废</button>
-                        </td>
-                    </tr>`).join("") || `<tr><td colspan="6"><div class="mis-empty">暂无医疗记录</div></td></tr>`}
-                </tbody></table></div>
+                <section class="medical-workbench">
+                    <div class="medical-workbench-head">
+                        <div>
+                            <p class="eyebrow">MEDICAL RECORD</p>
+                            <h2>医疗记录工作台</h2>
+                            <span>选择猫咪后录入体检、疫苗、绝育、治疗记录，附件图片会随记录一起保存。</span>
+                        </div>
+                        <div class="medical-mini-kpis">
+                            <article><span>医疗中</span><strong>${summary.medicalCatCount ?? 0}</strong></article>
+                            <article><span>观察中</span><strong>${summary.observingCatCount ?? 0}</strong></article>
+                            <article><span>异常</span><strong>${summary.abnormalRecordCount ?? 0}</strong></article>
+                            <article><span>本院</span><strong>${summary.myRecordCount ?? 0}</strong></article>
+                        </div>
+                    </div>
+                    <div class="medical-selector-bar">
+                        <select id="medical-status-filter">
+                            <option value="MEDICAL" ${statusFilter === "MEDICAL" ? "selected" : ""}>医疗中猫咪</option>
+                            <option value="OBSERVING" ${statusFilter === "OBSERVING" ? "selected" : ""}>观察中猫咪</option>
+                            <option value="ADOPTABLE" ${statusFilter === "ADOPTABLE" ? "selected" : ""}>可认养猫咪</option>
+                        </select>
+                        ${cats.length ? `<select id="medical-cat-select">${cats.map(cat => `<option value="${cat.catId}" ${currentCat === cat.catId ? "selected" : ""}>${cat.catId} · ${escapeHtml(cat.catName || "待命名")} · ${catStatusLabels[cat.status]?.label || cat.status}</option>`).join("")}</select>` : `<input id="medical-cat-select" value="${escapeHtml(currentCat)}" placeholder="输入猫咪编号，如 CAT260501001">`}
+                        <button class="ghost-btn" id="medical-cat-jump">查看</button>
+                        <a class="ghost-btn" href="#/admin/hospital">医院首页</a>
+                    </div>
+                    <div class="medical-current-card">
+                        <img ${imageAttrs(selectedCat?.coverUrl, "medical-current-photo", "当前猫咪照片")}>
+                        <div>
+                            <strong>${escapeHtml(selectedCat?.catName || currentCat || "请选择猫咪")}</strong>
+                            <span>${escapeHtml(currentCat || "-")} · ${escapeHtml(selectedCat?.foundPlace || "地点待补充")}</span>
+                        </div>
+                        <div class="medical-current-tags">
+                            ${selectedCat ? `${tag(selectedCat.status, catStatusLabels)}${tag(selectedCat.healthLevel, healthLabels)}` : `<span class="mis-tag info">待选择</span>`}
+                        </div>
+                    </div>
+                    <div class="medical-workbench-grid">
+                        <form class="mis-form medical-entry-form" id="medical-form">
+                            <input type="hidden" name="medicalId" value="">
+                            <div class="medical-form-section">
+                                <h3>基础信息</h3>
+                                <div class="medical-form-grid">
+                                    <label>记录类型<select name="recordType"><option value="CHECKUP">体检</option><option value="VACCINE">疫苗</option><option value="STERILIZATION">绝育</option><option value="TREATMENT">治疗</option><option value="OTHER">其他</option></select></label>
+                                    <label>记录日期<input name="recordDate" type="date"></label>
+                                    <label>健康结果<select name="healthResult"><option value="HEALTHY">健康</option><option value="OBSERVE">需观察</option><option value="SICK">患病</option><option value="SERIOUS">严重异常</option></select></label>
+                                    <label>费用<input name="cost" type="number" step="0.01"></label>
+                                </div>
+                            </div>
+                            <div class="medical-form-section">
+                                <h3>疫苗与绝育</h3>
+                                <div class="medical-form-grid">
+                                    <label>疫苗状态<select name="vaccineStatus"><option value="UNKNOWN">未知</option><option value="NOT_VACCINATED">未疫苗</option><option value="PARTIAL">部分接种</option><option value="VACCINATED">已疫苗</option></select></label>
+                                    <label>绝育状态<select name="sterilizedStatus"><option value="UNKNOWN">未知</option><option value="NOT_STERILIZED">未绝育</option><option value="STERILIZED">已绝育</option><option value="NOT_SUITABLE">暂不适合</option></select></label>
+                                </div>
+                            </div>
+                            <div class="medical-form-section">
+                                <h3>附件与说明</h3>
+                                <label class="wide medical-attachment-field">医疗附件
+                                    <input type="hidden" name="attachmentUrl">
+                                    <div class="medical-upload-panel">
+                                        <div class="medical-upload-preview">
+                                            <img class="upload-preview-image" id="medical-attachment-preview" src="/uploads/cats/no-photo.svg" alt="医疗附件预览">
+                                        </div>
+                                        <div class="medical-upload-controls">
+                                            <input id="medical-attachment-file" type="file" accept="image/jpeg,image/png,image/webp,image/gif">
+                                            <button class="ghost-btn" type="button" id="medical-attachment-upload" disabled>上传附件图片</button>
+                                            <div class="upload-progress" aria-live="polite">
+                                                <div class="upload-progress-bar"><span id="medical-upload-progress-bar"></span></div>
+                                                <strong id="medical-upload-progress-text">可以上传检查、治疗或诊断照片</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </label>
+                                <label class="wide">医疗说明<textarea name="description" required placeholder="填写检查结果、处理建议、用药或复查安排"></textarea></label>
+                                <label class="check"><input name="abnormalFlag" type="checkbox"> 标记异常，需要后续关注</label>
+                            </div>
+                            <div class="mis-form-actions"><button class="primary-btn" id="medical-submit">新增医疗记录</button><button class="ghost-btn" id="medical-reset" type="button">清空</button><span id="medical-message"></span></div>
+                        </form>
+                        <section class="medical-record-panel">
+                            <div class="mis-section-head"><h2>当前猫咪医疗记录</h2><span>${records.length} 条</span></div>
+                            <div class="mis-table-wrap"><table class="mis-table"><thead><tr><th>编号</th><th>日期</th><th>健康</th><th>说明</th><th>医院</th><th>附件</th><th>操作</th></tr></thead><tbody>
+                                ${(records || []).map(item => `<tr>
+                                    <td>${escapeHtml(item.medicalId)}</td>
+                                    <td>${escapeHtml(item.checkDate || "-")}</td>
+                                    <td>${tag(item.healthLevel, healthLabels)}</td>
+                                    <td>${escapeHtml(item.treatment || item.doctorNote || "-")}</td>
+                                    <td>${escapeHtml(item.hospital || "-")}</td>
+                                    <td>${item.attachmentUrl ? `<a href="${escapeHtml(item.attachmentUrl)}" target="_blank" rel="noopener"><img ${imageAttrs(item.attachmentUrl, "thumb-image mis-thumb", "医疗附件")}></a>` : "-"}</td>
+                                    <td>
+                                        <button class="ghost-btn" data-medical-edit="${escapeHtml(item.medicalId)}">回填编辑</button>
+                                        <button class="ghost-btn" data-medical-void="${escapeHtml(item.medicalId)}">作废</button>
+                                    </td>
+                                </tr>`).join("") || `<tr><td colspan="7"><div class="mis-empty">暂无医疗记录</div></td></tr>`}
+                            </tbody></table></div>
+                        </section>
+                    </div>
+                </section>
             `;
+            const medicalAttachmentUpload = bindMedicalAttachmentUpload();
             document.getElementById("medical-cat-jump").addEventListener("click", () => {
                 const status = document.getElementById("medical-status-filter").value;
                 window.location.hash = `#/admin/medical?status=${encodeURIComponent(status)}&catId=${encodeURIComponent(document.getElementById("medical-cat-select").value)}`;
@@ -1939,6 +2183,7 @@
                 const form = document.getElementById("medical-form");
                 form.reset();
                 form.elements.medicalId.value = "";
+                medicalAttachmentUpload.reset();
                 document.getElementById("medical-submit").textContent = "新增医疗记录";
                 document.getElementById("medical-message").textContent = "";
             });
@@ -1954,6 +2199,9 @@
                 message.textContent = "";
                 try {
                     setSubmitting(event.currentTarget, true);
+                    if (medicalAttachmentUpload.hasPendingFile()) {
+                        throw new Error("请先点击上传附件图片，上传完成后再保存医疗记录。");
+                    }
                     requireValid(message, [
                         validateCleanText("医疗说明", body.description, 5, 500),
                         body.cost !== null && body.cost < 0 ? "费用不能为负数" : ""
@@ -1985,7 +2233,7 @@
                 form.elements.vaccineStatus.value = record.vaccinated ? "VACCINATED" : "UNKNOWN";
                 form.elements.sterilizedStatus.value = record.sterilized ? "STERILIZED" : "UNKNOWN";
                 form.elements.cost.value = "";
-                form.elements.attachmentUrl.value = "";
+                medicalAttachmentUpload.setValue(record.attachmentUrl || "");
                 form.elements.description.value = record.treatment || record.doctorNote || "";
                 form.elements.abnormalFlag.checked = record.healthLevel === "C";
                 document.getElementById("medical-submit").textContent = "更新医疗记录";
@@ -2198,7 +2446,8 @@ ${audits || "暂无"}`;
             if (status) query.set("status", status);
             if (urgency) query.set("urgencyLevel", urgency);
             if (keyword) query.set("keyword", keyword);
-            window.location.hash = `#/admin/clues${query.toString() ? `?${query}` : ""}`;
+            const baseHash = location.hash.split("?")[0] === "#/volunteer/clues" ? "#/volunteer/clues" : "#/admin/clues";
+            window.location.hash = `${baseHash}${query.toString() ? `?${query}` : ""}`;
         });
         shell.querySelectorAll("[data-detail]").forEach(button => button.addEventListener("click", () => {
             const clue = clues.find(item => item.id === button.dataset.detail);
@@ -2391,17 +2640,23 @@ ${detail.agreementContent || "-"}`;
     }
 
     async function renderAdminFollowups(route, user) {
-        adminShell(route, user, `${adminHero(route)}<section class="mis-table-panel"><div class="mis-loading">正在加载回访任务...</div></section>`);
+        const isVolunteerFront = route.path === "#/volunteer/followups";
+        const content = `${isVolunteerFront ? pageHero(route) : adminHero(route)}<section class="mis-table-panel"><div class="mis-loading">正在加载回访任务...</div></section>`;
+        if (isVolunteerFront) {
+            userShell(route, user, content);
+        } else {
+            adminShell(route, user, content);
+        }
         const panel = shell.querySelector(".mis-table-panel");
         try {
             const params = new URLSearchParams(location.hash.split("?")[1] || "");
             const query = new URLSearchParams();
-            ["status", "planDate", "keyword"].forEach(key => {
+            ["status", "taskType", "planDate", "keyword"].forEach(key => {
                 if (params.get(key)) query.set(key, params.get(key));
             });
             const tasks = await api(`/api/admin/followup/tasks${query.toString() ? `?${query}` : ""}`);
             panel.innerHTML = `${followupSummaryCards(tasks)}${followupTaskTable(tasks, true, params.get("status") || "", params.get("planDate") || "", params.get("keyword") || "", params.get("taskType") || "", user)}`;
-            bindFollowupFilter("#/admin/followups");
+            bindFollowupFilter(route.path === "#/volunteer/followups" ? "#/volunteer/followups" : "#/admin/followups");
             bindFollowupTaskActions(route, user, true);
         } catch (error) {
             panel.innerHTML = `<div class="mis-error">${escapeHtml(error.message)}</div>`;
@@ -2447,7 +2702,8 @@ ${detail.agreementContent || "-"}`;
                     <td>${tag(task.status, followupTaskLabels)}</td>
                     <td>
                         <button class="ghost-btn" data-followup-detail="${task.id}">详情</button>
-                        ${!admin && task.feedbackEnabled ? `<button class="primary-btn" data-followup-submit="${task.id}">提交回访</button>` : ""}
+                        ${!admin && task.feedbackEnabled ? `<button class="primary-btn" data-followup-submit="${task.id}">上传状态</button>` : ""}
+                        ${admin && task.feedbackEnabled ? `<button class="primary-btn" data-followup-staff-submit="${task.id}">填写回访</button>` : ""}
                         ${admin && ["PENDING", "OVERDUE", "COMPLETED"].includes(task.status) ? `<button class="ghost-btn" data-followup-abnormal="${task.id}">标记异常</button>` : ""}
                     </td>
                 </tr>`).join("") || `<tr><td colspan="7"><div class="mis-empty">暂无回访任务</div></td></tr>`}
@@ -2486,36 +2742,33 @@ ${detail.agreementContent || "-"}`;
         });
         shell.querySelectorAll("[data-followup-detail]").forEach(button => button.addEventListener("click", async () => {
             const path = admin ? `/api/admin/followup/tasks/${button.dataset.followupDetail}` : `/api/my/followup/tasks/${button.dataset.followupDetail}`;
-            const detail = await api(path);
-            alert(followupTaskDetailText(detail));
+            openFollowupMessageDialog("回访任务详情", "正在加载回访任务详情...");
+            try {
+                const detail = await api(path);
+                openFollowupDetailDialog(detail);
+            } catch (error) {
+                openFollowupMessageDialog("回访任务详情", `加载失败：${error.message || "请稍后再试"}`);
+            }
         }));
         shell.querySelectorAll("[data-followup-submit]").forEach(button => button.addEventListener("click", async () => {
-            const content = prompt("回访文字内容");
-            if (!content) return;
-            const catCondition = prompt("猫咪当前状态描述");
-            if (!catCondition) return;
-            const environmentDesc = prompt("生活环境描述");
-            if (!environmentDesc) return;
-            const photoUrl = prompt("回访照片 URL", "/uploads/cats/no-photo.svg") || "";
-            const abnormalFlag = confirm("是否存在异常？");
-            const abnormalDesc = abnormalFlag ? prompt("异常说明") : "";
-            if (abnormalFlag && !abnormalDesc) return;
-            const validationMessage = [
-                validateCleanText("回访内容", content, 5, 500),
-                validateCleanText("猫咪状态描述", catCondition, 2, 500),
-                validateCleanText("环境描述", environmentDesc, 2, 500),
-                abnormalFlag ? validateCleanText("异常说明", abnormalDesc, 5, 500) : ""
-            ].find(Boolean);
-            if (validationMessage) {
-                alert(validationMessage);
-                return;
-            }
+            const payload = await openFollowupRecordDialog("上传猫咪状态记录", false);
+            if (!payload) return;
             await api(`/api/my/followup/tasks/${button.dataset.followupSubmit}/records`, {
                 method: "POST",
-                body: JSON.stringify({ content, catCondition, environmentDesc, photoUrl, abnormalFlag, abnormalDesc })
+                body: JSON.stringify(payload)
             });
-            alert(abnormalFlag ? "已提交异常反馈，管理员将跟进处理。" : "提交成功，回访任务已完成。");
+            alert(payload.abnormalFlag ? "已提交异常状态，志愿者或管理员将跟进处理。" : "猫咪状态已上传到回访记录。");
             renderMyFollowups(route, user);
+        }));
+        shell.querySelectorAll("[data-followup-staff-submit]").forEach(button => button.addEventListener("click", async () => {
+            const payload = await openFollowupRecordDialog("填写回访记录", true);
+            if (!payload) return;
+            await api(`/api/admin/followup/tasks/${button.dataset.followupStaffSubmit}/records`, {
+                method: "POST",
+                body: JSON.stringify(payload)
+            });
+            alert(payload.abnormalFlag ? "已记录异常回访，并生成预警。" : "回访记录已保存。");
+            renderAdminFollowups(route, user);
         }));
         shell.querySelectorAll("[data-followup-abnormal]").forEach(button => button.addEventListener("click", async () => {
             const abnormalDesc = prompt("异常说明");
@@ -2529,20 +2782,325 @@ ${detail.agreementContent || "-"}`;
         }));
     }
 
-    function followupTaskDetailText(task) {
+    function openFollowupRecordDialog(title, staffMode) {
+        return new Promise(resolve => {
+            document.querySelector(".followup-record-modal")?.remove();
+            const modal = document.createElement("div");
+            modal.className = "reading-modal-backdrop followup-record-modal";
+            modal.innerHTML = `
+                <section class="reading-modal followup-record-dialog" role="dialog" aria-modal="true">
+                    <div class="reading-modal-head">
+                        <h3>${escapeHtml(title)}</h3>
+                        <button class="ghost-btn compact" type="button" data-followup-close>关闭</button>
+                    </div>
+                    <form class="mis-form followup-record-form">
+                        <label class="wide">${staffMode ? "回访内容" : "猫咪近况"}<textarea name="content" required placeholder="${staffMode ? "填写电话/现场/线上回访情况" : "写一下猫咪最近吃饭、精神、排便、适应情况"}"></textarea></label>
+                        <label>猫咪状态<input name="catCondition" required placeholder="例如：精神好，食欲正常"></label>
+                        <label>生活环境<input name="environmentDesc" required placeholder="例如：门窗防护正常，猫砂盆干净"></label>
+                        <label class="wide followup-photo-field">回访照片
+                            <input type="hidden" name="photoUrl">
+                            <div class="followup-upload-panel">
+                                <div class="followup-upload-preview">
+                                    <img class="upload-preview-image" data-followup-preview src="/uploads/cats/no-photo.svg" alt="回访照片预览">
+                                </div>
+                                <div class="followup-upload-controls">
+                                    <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-followup-file>
+                                    <button class="ghost-btn" type="button" data-followup-upload disabled>上传回访照片</button>
+                                    <div class="upload-progress" aria-live="polite">
+                                        <div class="upload-progress-bar"><span data-followup-progress-bar></span></div>
+                                        <strong data-followup-progress-text>可以上传猫咪近况或环境照片</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </label>
+                        <label class="check wide"><input type="checkbox" name="abnormalFlag"> <span>存在异常情况</span></label>
+                        <label class="wide followup-abnormal-field">异常说明<textarea name="abnormalDesc" placeholder="如食欲下降、逃逸风险、环境不稳定等"></textarea></label>
+                        <div class="mis-form-actions">
+                            <button class="primary-btn" type="submit">保存记录</button>
+                            <button class="ghost-btn" type="button" data-followup-close>取消</button>
+                        </div>
+                    </form>
+                </section>
+            `;
+            document.body.appendChild(modal);
+            const form = modal.querySelector("form");
+            const abnormalCheck = form.elements.abnormalFlag;
+            const abnormalField = modal.querySelector(".followup-abnormal-field");
+            const fileInput = modal.querySelector("[data-followup-file]");
+            const uploadButton = modal.querySelector("[data-followup-upload]");
+            const preview = modal.querySelector("[data-followup-preview]");
+            const progressBar = modal.querySelector("[data-followup-progress-bar]");
+            const progressText = modal.querySelector("[data-followup-progress-text]");
+            let previewObjectUrl = "";
+            const close = value => {
+                if (previewObjectUrl) {
+                    URL.revokeObjectURL(previewObjectUrl);
+                    previewObjectUrl = "";
+                }
+                modal.remove();
+                resolve(value);
+            };
+            const syncAbnormal = () => {
+                abnormalField.classList.toggle("is-visible", abnormalCheck.checked);
+            };
+            modal.querySelectorAll("[data-followup-close]").forEach(button => button.addEventListener("click", () => close(null)));
+            modal.addEventListener("click", event => {
+                if (event.target === modal) close(null);
+            });
+            abnormalCheck.addEventListener("change", syncAbnormal);
+            fileInput.addEventListener("change", () => {
+                const file = fileInput.files?.[0];
+                form.elements.photoUrl.value = "";
+                progressBar.style.width = "0%";
+                progressText.textContent = file ? "待上传" : "可以上传猫咪近况或环境照片";
+                uploadButton.disabled = !file;
+                if (previewObjectUrl) {
+                    URL.revokeObjectURL(previewObjectUrl);
+                    previewObjectUrl = "";
+                }
+                if (!file) {
+                    preview.src = "/uploads/cats/no-photo.svg";
+                    return;
+                }
+                if (!file.type.startsWith("image/")) {
+                    progressText.textContent = "请选择图片文件";
+                    uploadButton.disabled = true;
+                    preview.src = "/uploads/cats/no-photo.svg";
+                    return;
+                }
+                previewObjectUrl = URL.createObjectURL(file);
+                preview.src = previewObjectUrl;
+            });
+            uploadButton.addEventListener("click", async () => {
+                const file = fileInput.files?.[0];
+                if (!file) {
+                    progressText.textContent = "请先选择照片";
+                    return;
+                }
+                if (file.size > 5 * 1024 * 1024) {
+                    progressText.textContent = "照片不能超过 5MB";
+                    return;
+                }
+                try {
+                    uploadButton.disabled = true;
+                    progressBar.style.width = "0%";
+                    progressText.textContent = "上传中 0%";
+                    const result = await uploadFileWithProgress("/api/uploads/clues", file, percent => {
+                        progressBar.style.width = `${percent}%`;
+                        progressText.textContent = `上传中 ${percent}%`;
+                    });
+                    form.elements.photoUrl.value = result.url;
+                    preview.src = result.url;
+                    progressBar.style.width = "100%";
+                    progressText.textContent = "上传完成";
+                } catch (error) {
+                    form.elements.photoUrl.value = "";
+                    progressText.textContent = error.message;
+                    uploadButton.disabled = false;
+                }
+            });
+            form.addEventListener("submit", event => {
+                event.preventDefault();
+                const body = Object.fromEntries(new FormData(form).entries());
+                body.abnormalFlag = abnormalCheck.checked;
+                body.photoUrl = String(body.photoUrl || "").trim();
+                body.abnormalDesc = body.abnormalFlag ? String(body.abnormalDesc || "").trim() : "";
+                if (fileInput.files?.[0] && !body.photoUrl) {
+                    alert("请先点击上传回访照片，上传完成后再保存记录。");
+                    return;
+                }
+                const validationMessage = [
+                    validateCleanText(staffMode ? "回访内容" : "猫咪近况", body.content, 5, 500),
+                    validateCleanText("猫咪状态描述", body.catCondition, 2, 500),
+                    validateCleanText("环境描述", body.environmentDesc, 2, 500),
+                    body.abnormalFlag ? validateCleanText("异常说明", body.abnormalDesc, 5, 500) : ""
+                ].find(Boolean);
+                if (validationMessage) {
+                    alert(validationMessage);
+                    return;
+                }
+                close(body);
+            });
+            syncAbnormal();
+            form.elements.content.focus();
+        });
+    }
+
+    function followupRecordSource(record) {
+        const role = normalizeRole(record.submitterRole);
+        if (role === "ADMIN") return `管理员：${record.submitterName || record.submitterId || "-"}`;
+        if (role === "VOLUNTEER") return `志愿者：${record.submitterName || record.submitterId || "-"}`;
+        if (role === "SYSTEM") return record.submitterName || "历史完成记录";
+        return `认养人：${record.submitterName || record.submitterId || record.adopterId || "-"}`;
+    }
+
+    function inferredCompletedFollowupRecord(task) {
+        if (task.status !== "COMPLETED") return null;
+        const taskName = followupTaskLabels[task.taskType]?.label || "本次";
+        const catName = task.catName || task.catId || "猫咪";
+        return {
+            content: task.recordContent || `${catName}${taskName}已完成，回访结果为正常。`,
+            catCondition: task.catCondition || "猫咪精神、食欲和排便情况正常，已适应当前照护环境。",
+            environmentDesc: task.environmentDesc || "生活环境稳定，基础防护和猫砂、饮水、进食条件正常。",
+            photoUrl: task.photoUrl || "",
+            abnormalDesc: task.abnormalDesc || "无异常",
+            volunteerComment: task.volunteerComment || "由历史任务状态生成的完成摘要",
+            submitterRole: "SYSTEM",
+            submitterName: "历史完成记录",
+            submitTime: task.submitTime || task.actualDate || task.planDate || ""
+        };
+    }
+
+    function followupRecordsText(records, task = null) {
+        let rows = Array.isArray(records) ? records : [];
+        if (!rows.length && task) {
+            const fallback = inferredCompletedFollowupRecord(task);
+            if (fallback) rows = [fallback];
+        }
+        if (!rows.length) return "暂无回访记录";
+        return rows.map((record, index) => {
+            const time = String(record.submitTime || "-").replace("T", " ");
+            const content = record.content || "未填写回访内容";
+            const catCondition = record.catCondition || "未填写猫咪状态";
+            const environmentDesc = record.environmentDesc || "未填写生活环境";
+            const abnormalDesc = record.abnormalDesc || (record.abnormalFlag ? "异常情况未补充说明" : "无异常");
+            return `${index + 1}. ${followupRecordSource(record)} / ${time}
+内容：${content}
+猫咪状态：${catCondition}
+生活环境：${environmentDesc}
+照片：${record.photoUrl || "-"}
+异常说明：${abnormalDesc}
+备注：${record.volunteerComment || "-"}`;
+        }).join("\n\n");
+    }
+
+    function followupRecordRows(records, task = null) {
+        let rows = Array.isArray(records) ? records : [];
+        if (!rows.length && task) {
+            const fallback = inferredCompletedFollowupRecord(task);
+            if (fallback) rows = [fallback];
+        }
+        return rows;
+    }
+
+    function followupValue(value, fallback = "-") {
+        const text = String(value || "").trim();
+        return escapeHtml(text || fallback);
+    }
+
+    function followupTime(value) {
+        return followupValue(String(value || "").replace("T", " "));
+    }
+
+    function followupPhotoHtml(url, alt) {
+        const value = String(url || "").trim();
+        if (!value) return `<div class="followup-no-photo">暂无照片</div>`;
+        return `<a class="followup-photo-link" href="${escapeHtml(value)}" target="_blank" rel="noopener">
+            <img ${imageAttrs(value, "followup-detail-photo", alt || "回访照片")}>
+        </a>`;
+    }
+
+    function openFollowupMessageDialog(title, message) {
+        document.querySelector(".followup-detail-modal")?.remove();
+        const modal = document.createElement("div");
+        modal.className = "reading-modal-backdrop followup-detail-modal";
+        modal.innerHTML = `
+            <section class="reading-modal followup-detail-dialog" role="dialog" aria-modal="true">
+                <div class="reading-modal-head">
+                    <h3>${escapeHtml(title)}</h3>
+                    <button class="ghost-btn compact" type="button" data-followup-detail-close>关闭</button>
+                </div>
+                <div class="followup-detail-body">
+                    <div class="mis-loading">${escapeHtml(message)}</div>
+                </div>
+            </section>
+        `;
+        document.body.appendChild(modal);
+        const close = () => modal.remove();
+        modal.querySelector("[data-followup-detail-close]").addEventListener("click", close);
+        modal.addEventListener("click", event => {
+            if (event.target === modal) close();
+        });
+    }
+
+    function openFollowupDetailDialog(task) {
+        document.querySelector(".followup-detail-modal")?.remove();
+        const fallback = inferredCompletedFollowupRecord(task) || {};
+        const latest = {
+            content: task.recordContent || fallback.content || "-",
+            catCondition: task.catCondition || fallback.catCondition || "-",
+            environmentDesc: task.environmentDesc || fallback.environmentDesc || "-",
+            abnormalDesc: task.abnormalDesc || fallback.abnormalDesc || "-",
+            photoUrl: task.photoUrl || fallback.photoUrl || "",
+            submitTime: task.submitTime || fallback.submitTime || "-"
+        };
+        const modal = document.createElement("div");
+        modal.className = "reading-modal-backdrop followup-detail-modal";
+        modal.innerHTML = `
+            <section class="reading-modal followup-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="followup-detail-title">
+                <div class="reading-modal-head">
+                    <h3 id="followup-detail-title">回访任务详情</h3>
+                    <button class="ghost-btn compact" type="button" data-followup-detail-close>关闭</button>
+                </div>
+                <div class="followup-detail-body">
+                    <section class="followup-detail-section">
+                        <h4>任务信息</h4>
+                        <div class="followup-detail-grid">
+                            <span>任务编号</span><strong>${followupValue(task.id)}</strong>
+                            <span>猫咪</span><strong>${followupValue(task.catName || task.catId)}</strong>
+                            <span>认养人</span><strong>${followupValue(task.adopterName || task.adopterId)}</strong>
+                            <span>任务类型</span><strong>${followupValue(followupTaskLabels[task.taskType]?.label || task.taskType)}</strong>
+                            <span>计划日期</span><strong>${followupValue(task.planDate)}</strong>
+                            <span>当前状态</span><strong>${followupValue(followupTaskLabels[task.status]?.label || task.status)}</strong>
+                            <span>预警数量</span><strong>${followupValue(`${task.warningCount || 0} 条`)}</strong>
+                        </div>
+                    </section>
+                    <section class="followup-detail-section">
+                        <h4>最新回访</h4>
+                        <div class="followup-latest-card">
+                            ${followupPhotoHtml(latest.photoUrl, "最新回访照片")}
+                            <div class="followup-latest-text">
+                                <p><b>提交时间</b>${followupTime(latest.submitTime)}</p>
+                                <p><b>回访内容</b>${followupValue(latest.content)}</p>
+                                <p><b>猫咪状态</b>${followupValue(latest.catCondition)}</p>
+                                <p><b>生活环境</b>${followupValue(latest.environmentDesc)}</p>
+                                <p><b>异常说明</b>${followupValue(latest.abnormalDesc)}</p>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </section>
+        `;
+        document.body.appendChild(modal);
+        const close = () => modal.remove();
+        modal.querySelector("[data-followup-detail-close]").addEventListener("click", close);
+        modal.addEventListener("click", event => {
+            if (event.target === modal) close();
+        });
+    }
+
+    function followupTaskDetailText(task, records = []) {
+        const fallback = inferredCompletedFollowupRecord(task) || {};
+        const latestContent = task.recordContent || fallback.content || "-";
+        const latestCatCondition = task.catCondition || fallback.catCondition || "-";
+        const latestEnvironment = task.environmentDesc || fallback.environmentDesc || "-";
+        const latestAbnormal = task.abnormalDesc || fallback.abnormalDesc || "-";
+        const latestSubmitTime = task.submitTime || fallback.submitTime || "-";
         return `任务：${task.id}
 猫咪：${task.catName || task.catId}
 认养人：${task.adopterName || task.adopterId}
 类型：${followupTaskLabels[task.taskType]?.label || task.taskType}
 计划日期：${task.planDate || "-"}
 状态：${followupTaskLabels[task.status]?.label || task.status}
-提交时间：${(task.submitTime || "-").replace("T", " ")}
-回访内容：${task.recordContent || "-"}
-猫咪状态：${task.catCondition || "-"}
-生活环境：${task.environmentDesc || "-"}
-异常说明：${task.abnormalDesc || "-"}
-志愿者备注：${task.volunteerComment || "-"}
-关联预警：${task.warningCount || 0} 条`;
+最新提交：${String(latestSubmitTime).replace("T", " ")}
+最新内容：${latestContent}
+最新猫咪状态：${latestCatCondition}
+最新生活环境：${latestEnvironment}
+最新异常说明：${latestAbnormal}
+关联预警：${task.warningCount || 0} 条
+
+回访记录：
+${followupRecordsText(records, task)}`;
     }
 
     async function renderAdminWarnings(route, user) {
@@ -2902,6 +3460,7 @@ ${detail.agreementContent || "-"}`;
     async function renderHome(route, user) {
         userShell(route, user, `<section class="front-home"><div class="mis-loading">正在加载门户数据...</div></section>`);
         const panel = shell.querySelector(".front-home");
+        const hideFrontSelfService = !canUseFrontSelfService(user);
         try {
             const [stats, cats, notices, roleData] = await Promise.all([
                 api("/api/dashboard/stats").catch(() => ({})),
@@ -2917,7 +3476,7 @@ ${detail.agreementContent || "-"}`;
                         <p>校园公益认养与流浪猫全生命周期管理平台，把发现上报、核实建档、医疗记录、在线认养、审核交接和回访预警放进同一条可追溯链路。</p>
                         <div class="actions">
                             <a class="primary-btn" href="#/cats">查看可认养猫咪</a>
-                            <a class="ghost-btn" href="${user ? "#/clues/submit" : "#/login?redirect=%23%2Fclues%2Fsubmit"}">上报猫咪线索</a>
+                            ${hideFrontSelfService ? "" : `<a class="ghost-btn" href="${user ? "#/clues/submit" : "#/login?redirect=%23%2Fclues%2Fsubmit"}">上报猫咪线索</a>`}
                             ${user && normalizeRole(user.role) !== "STUDENT" ? `<a class="ghost-btn" href="${escapeHtml(roleLanding(user))}">进入后台</a>` : ""}
                         </div>
                     </div>
@@ -2933,7 +3492,7 @@ ${detail.agreementContent || "-"}`;
                         { icon: "📷", title: "回访提醒", text: "交接后按 7/30/90 天提交照片和适应反馈。", link: user ? "#/my/followups" : "#/login?redirect=%23%2Fmy%2Ffollowups", action: "查看回访" },
                         { icon: "📝", title: "发现线索", text: "发现校园猫咪后，可提交地点、照片和简要描述。", link: user ? "#/clues/submit" : "#/login?redirect=%23%2Fclues%2Fsubmit", action: "提交线索" },
                         { icon: "💚", title: "公益协作", text: "志愿者、医院和管理员共同完成救助与认养闭环。", link: "#/notices", action: "查看公告" }
-                    ].map(item => `
+                    ].filter(item => !hideFrontSelfService || !["回访提醒", "发现线索"].includes(item.title)).map(item => `
                         <a class="portal-guide-card" href="${item.link}">
                             <span>${item.icon}</span>
                             <strong>${escapeHtml(item.title)}</strong>
@@ -2987,7 +3546,7 @@ ${detail.agreementContent || "-"}`;
                             <a class="ghost-btn compact" href="#/notices">全部公告</a>
                         </div>
                         <div class="home-notice-list">
-                            ${(notices || []).slice(0, 3).map(item => {
+                            ${(notices || []).map(item => {
                                 const meta = noticeMeta(item);
                                 return `
                                     <article class="home-notice-card">
@@ -3022,7 +3581,7 @@ ${detail.agreementContent || "-"}`;
                             <span><strong>医疗协作</strong><small>体检、疫苗、绝育记录</small></span>
                             <span><strong>回访跟进</strong><small>7/30/90 天反馈</small></span>
                         </div>
-                        <div class="actions"><a class="primary-btn" href="${user ? "#/clues/submit" : "#/login?redirect=%23%2Fclues%2Fsubmit"}">提交发现线索</a><a class="ghost-btn" href="${user ? "#/my/messages" : "#/login?redirect=%23%2Fmy%2Fmessages"}">我的消息</a></div>
+                        <div class="actions">${hideFrontSelfService ? "" : `<a class="primary-btn" href="${user ? "#/clues/submit" : "#/login?redirect=%23%2Fclues%2Fsubmit"}">提交发现线索</a>`}<a class="ghost-btn" href="${user ? "#/my/messages" : "#/login?redirect=%23%2Fmy%2Fmessages"}">我的消息</a></div>
                     </div>
                 </section>
             `;
@@ -3199,39 +3758,59 @@ ${detail.agreementContent || "-"}`;
         }
     }
 
+    function profileMetricCard(label, value, hint, href) {
+        return `<a class="profile-metric-card" href="${escapeHtml(href)}">
+            <span>${escapeHtml(label)}</span>
+            <strong>${escapeHtml(value ?? 0)}</strong>
+            <small>${escapeHtml(hint)}</small>
+        </a>`;
+    }
+
     async function renderProfile(route, user) {
         userShell(route, user, `${pageHero(route)}<section class="mis-table-panel"><div class="mis-loading">正在加载个人中心...</div></section>`);
         const panel = shell.querySelector(".mis-table-panel");
+        const hideFrontSelfService = !canUseFrontSelfService(user);
         try {
             const [freshUser, clues, apps, tasks, unread] = await Promise.all([
                 api("/api/users/me"),
-                api("/api/my/clues").catch(() => []),
-                api("/api/my/adoption/applications").catch(() => []),
-                api("/api/my/followup/tasks").catch(() => []),
+                hideFrontSelfService ? Promise.resolve([]) : api("/api/my/clues").catch(() => []),
+                hideFrontSelfService ? Promise.resolve([]) : api("/api/my/adoption/applications").catch(() => []),
+                hideFrontSelfService ? Promise.resolve([]) : api("/api/my/followup/tasks").catch(() => []),
                 api("/api/user/messages/unread-count").catch(() => 0)
             ]);
             saveAuth({ token: token(), user: freshUser });
             panel.innerHTML = `
-                <section class="profile-grid">
-                    <article class="panel profile-card">
-                        <p class="eyebrow">Account</p>
-                        <h2>${escapeHtml(freshUser.userName)}</h2>
-                        <p>${escapeHtml(freshUser.schoolNo || "-")} · ${escapeHtml(freshUser.phone || "-")} · ${escapeHtml(freshUser.college || "-")}</p>
-                        <span class="mis-tag primary">${escapeHtml(roleLabels[normalizeRole(freshUser.role)] || normalizeRole(freshUser.role))}</span>
-                        ${normalizeRole(freshUser.role) !== "STUDENT" ? `<a class="primary-btn" href="${escapeHtml(roleLanding(freshUser))}">进入后台</a>` : ""}
+                <section class="profile-dashboard">
+                    <article class="profile-account-card">
+                        <div class="profile-avatar">${escapeHtml((freshUser.userName || "我").slice(0, 1))}</div>
+                        <div>
+                            <p class="eyebrow">ACCOUNT</p>
+                            <h2>${escapeHtml(freshUser.userName)}</h2>
+                            <span>${escapeHtml(freshUser.schoolNo || "-")} · ${escapeHtml(freshUser.phone || "-")}</span>
+                            <span>${escapeHtml(freshUser.college || "-")}</span>
+                        </div>
+                        <div class="profile-role-actions">
+                            <span class="mis-tag primary">${escapeHtml(roleLabels[normalizeRole(freshUser.role)] || normalizeRole(freshUser.role))}</span>
+                            ${normalizeRole(freshUser.role) !== "STUDENT" ? `<a class="primary-btn compact" href="${escapeHtml(roleLanding(freshUser))}">进入后台</a>` : ""}
+                        </div>
                     </article>
-                    <article class="panel"><strong>${clues.length}</strong><span>我的线索</span><a class="ghost-btn" href="#/my/clues">查看</a></article>
-                    <article class="panel"><strong>${apps.length}</strong><span>我的申请</span><a class="ghost-btn" href="#/my/applications">查看</a></article>
-                    <article class="panel"><strong>${tasks.length}</strong><span>我的回访</span><a class="ghost-btn" href="#/my/followups">查看</a></article>
-                    <article class="panel"><strong>${unread}</strong><span>未读消息</span><a class="ghost-btn" href="#/my/messages">查看</a></article>
+                    <div class="profile-quick-grid">
+                        ${hideFrontSelfService ? "" : profileMetricCard("我的线索", clues.length, "查看核实进度", "#/my/clues")}
+                        ${hideFrontSelfService ? "" : profileMetricCard("我的申请", apps.length, "查看审核与交接", "#/my/applications")}
+                        ${hideFrontSelfService ? "" : profileMetricCard("我的回访", tasks.length, "上传猫咪近况", "#/my/followups")}
+                        ${profileMetricCard("未读消息", unread, "查看系统提醒", "#/my/messages")}
+                    </div>
                 </section>
-                <form class="mis-form front-form" id="profile-form">
-                    <label>姓名<input name="userName" value="${escapeHtml(freshUser.userName || "")}" required></label>
-                    <label>手机号<input name="phone" value="${escapeHtml(freshUser.phone || "")}" required></label>
-                    <label>学院/单位<input name="college" value="${escapeHtml(freshUser.college || "")}" required></label>
-                    <label class="wide">养宠经验<textarea name="petExperience">${escapeHtml(freshUser.petExperience || "")}</textarea></label>
-                    <div class="mis-form-actions"><button class="primary-btn">保存资料</button><span id="profile-message"></span></div>
-                </form>
+                <section class="profile-edit-panel">
+                    <div class="mis-section-head"><h2>资料维护</h2><span>${hideFrontSelfService ? "用于医疗协作、消息通知和身份核验" : "用于线索、申请、回访联系和身份核验"}</span></div>
+                    <form class="mis-form front-form profile-form" id="profile-form">
+                        <label>姓名<input name="userName" value="${escapeHtml(freshUser.userName || "")}" required></label>
+                        <label>手机号<input name="phone" value="${escapeHtml(freshUser.phone || "")}" required></label>
+                        <label>学院/单位<input name="college" value="${escapeHtml(freshUser.college || "")}" required></label>
+                        <label class="wide">养宠经验<textarea name="petExperience">${escapeHtml(freshUser.petExperience || "")}</textarea></label>
+                        <div class="mis-form-actions"><button class="primary-btn">保存资料</button><span id="profile-message"></span></div>
+                    </form>
+                </section>
             `;
             document.getElementById("profile-form").addEventListener("submit", async event => {
                 event.preventDefault();
@@ -3612,7 +4191,7 @@ ${detail.agreementContent || "-"}`;
                     body: JSON.stringify({ message: text, history: previousHistory })
                 });
                 if (!response.ok || !response.body) {
-                    throw new Error("Agent is temporarily unavailable. Please try again later.");
+                    throw new Error("智能体暂时不可用，请稍后再试。");
                 }
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder("utf-8");
@@ -3630,7 +4209,7 @@ ${detail.agreementContent || "-"}`;
                     dialog.scrollTop = dialog.scrollHeight;
                 }
                 finishThinking();
-                thinking.textContent = clean(answer) || "No valid answer was generated.";
+                thinking.textContent = clean(answer) || "暂时没有生成有效回答。";
                 history[history.length - 1] = { role: "assistant", content: thinking.textContent };
                 return;
                 const local = localAnswers.find(item => item.test(text));
@@ -3646,7 +4225,7 @@ ${detail.agreementContent || "-"}`;
                 thinking.textContent = result.answer || "我暂时没有生成有效回答。";
             } catch (error) {
                 thinking.classList.remove("is-thinking", "has-running-cat");
-                thinking.textContent = error.message || "Agent is temporarily unavailable. Please try again later.";
+                thinking.textContent = error.message || "智能体暂时不可用，请稍后再试。";
             } finally {
                 form.querySelector("button").disabled = false;
                 dialog.scrollTop = dialog.scrollHeight;
@@ -3715,6 +4294,251 @@ ${detail.agreementContent || "-"}`;
         const body = { title, content, noticeType, publishStatus, sortOrder, sendMessage };
         await api(id ? `/api/admin/notices/${id}` : "/api/admin/notices", { method: id ? "PUT" : "POST", body: JSON.stringify(body) });
         renderAdminNotices(route, user);
+    }
+
+    async function renderFrontAdminNotices(route, user) {
+        userShell(route, user, `${pageHero(route)}<section class="mis-table-panel"><div class="mis-loading">正在加载公告发布台...</div></section>`);
+        const panel = shell.querySelector(".mis-table-panel");
+        try {
+            const params = new URLSearchParams(location.hash.split("?")[1] || "");
+            const query = new URLSearchParams();
+            if (params.get("publishStatus")) query.set("publishStatus", params.get("publishStatus"));
+            if (params.get("noticeType")) query.set("noticeType", params.get("noticeType"));
+            const [notices, allNotices] = await Promise.all([
+                api(`/api/admin/notices${query.toString() ? `?${query}` : ""}`),
+                query.toString() ? api("/api/admin/notices") : Promise.resolve(null)
+            ]);
+            const editingId = params.get("edit") || "";
+            const editing = (allNotices || notices).find(item => String(item.id) === editingId);
+            const roleOptions = noticeRoleOptions();
+            const selectedRoles = noticeTargetRoleSet(editing?.targetRoles);
+            panel.innerHTML = `
+                <section class="front-notice-admin">
+                    <form class="mis-form front-form front-notice-form" id="front-notice-form">
+                        <input type="hidden" name="id" value="${escapeHtml(editing?.id || "")}">
+                        <input type="hidden" name="imageUrl" id="front-notice-image-url" value="${escapeHtml(editing?.imageUrl || "")}">
+                        <div class="mis-section-head"><h2>${editing ? "编辑公告" : "发布新公告"}</h2><span>公告会同步显示到前台公告页</span></div>
+                        <label class="wide">标题<input name="title" value="${escapeHtml(editing?.title || "")}" placeholder="例如：本周认养开放日安排" required></label>
+                        <label>类型<select name="noticeType">
+                            ${["SYSTEM", "ADOPTION", "FOLLOWUP"].map(type => `<option value="${type}" ${editing?.noticeType === type ? "selected" : ""}>${noticeTypeLabel(type)}</option>`).join("")}
+                        </select></label>
+                        <label>状态<select name="publishStatus">
+                            ${["DRAFT", "PUBLISHED", "OFFLINE"].map(status => `<option value="${status}" ${editing?.publishStatus === status ? "selected" : ""}>${noticeStatusLabel(status)}</option>`).join("")}
+                        </select></label>
+                        <label>排序<input name="sortOrder" type="number" value="${escapeHtml(editing?.sortOrder ?? 0)}"></label>
+                        <label class="check"><input name="sendMessage" type="checkbox"> <span>发布时同步发送站内消息</span></label>
+                        <div class="wide notice-role-scope">
+                            <strong>发布范围</strong>
+                            <div>
+                                ${roleOptions.map(option => `<label class="role-check"><input type="checkbox" name="targetRoles" value="${option.value}" ${selectedRoles.has(option.value) ? "checked" : ""}><span class="role-check-card" data-role="${option.value}"><span class="role-cat-icon" aria-hidden="true">${noticeRoleEmoji(option.value)}</span><span class="role-check-label">${option.label}</span></span></label>`).join("")}
+                            </div>
+                        </div>
+                        <div class="wide notice-image-editor">
+                            <div class="notice-image-preview">
+                                <img id="front-notice-image-preview" ${imageAttrs(editing?.imageUrl || noticeMeta(editing || {}).image, "notice-edit-preview-image", "公告图片预览")}>
+                            </div>
+                            <div class="notice-image-controls">
+                                <strong>公告图片</strong>
+                                <input id="front-notice-image-file" type="file" accept="image/jpeg,image/png,image/webp,image/gif">
+                                <div class="notice-image-actions">
+                                    <button class="ghost-btn compact" type="button" id="front-notice-upload-image">上传/更换图片</button>
+                                    <button class="ghost-btn compact" type="button" id="front-notice-clear-image">移除图片</button>
+                                </div>
+                                <span id="front-notice-upload-message">${editing?.imageUrl ? "当前公告已设置图片" : "未上传时会使用默认公告配图"}</span>
+                            </div>
+                        </div>
+                        <label class="wide">公告内容<textarea name="content" rows="8" placeholder="填写公告正文，建议包含时间、地点、对象和注意事项" required>${escapeHtml(editing?.content || "")}</textarea></label>
+                        <div class="mis-form-actions">
+                            <button class="primary-btn">${editing ? "保存公告" : "新增公告"}</button>
+                            ${editing ? `<a class="ghost-btn" href="#/admin-notices">取消编辑</a>` : ""}
+                            <span id="front-notice-message"></span>
+                        </div>
+                    </form>
+                    <section class="front-notice-list">
+                        <div class="mis-section-head"><h2>公告列表</h2><span>${notices.length} 条</span></div>
+                        <div class="mis-filter-row">
+                            <select id="front-notice-status"><option value="">全部状态</option>${["DRAFT", "PUBLISHED", "OFFLINE"].map(v => `<option value="${v}" ${params.get("publishStatus") === v ? "selected" : ""}>${noticeStatusLabel(v)}</option>`).join("")}</select>
+                            <select id="front-notice-type"><option value="">全部类型</option>${["SYSTEM", "ADOPTION", "FOLLOWUP"].map(v => `<option value="${v}" ${params.get("noticeType") === v ? "selected" : ""}>${noticeTypeLabel(v)}</option>`).join("")}</select>
+                            <button class="ghost-btn" id="front-notice-filter">筛选</button>
+                        </div>
+                        <div class="front-notice-admin-list">
+                            ${(notices || []).map(item => `
+                                <article class="front-notice-admin-card">
+                                    <img ${imageAttrs(item.imageUrl || noticeMeta(item).image, "front-notice-admin-thumb", item.title)}>
+                                    <div>
+                                        <strong>${escapeHtml(item.title)}</strong>
+                                        <p>${escapeHtml(item.content)}</p>
+                                        <span>${noticeTypeLabel(item.noticeType)} · ${noticeStatusLabel(item.publishStatus)} · ${noticeRoleText(item.targetRoles)} · ${(item.publishTime || item.updateTime || "").replace("T", " ")}</span>
+                                    </div>
+                                    <div class="actions">
+                                        <a class="ghost-btn compact" href="#/admin-notices?edit=${encodeURIComponent(item.id)}">编辑</a>
+                                        <button class="ghost-btn compact" data-front-notice-publish="${escapeHtml(item.id)}">发布</button>
+                                        <button class="ghost-btn compact" data-front-notice-offline="${escapeHtml(item.id)}">下架</button>
+                                        <button class="ghost-btn compact" data-front-notice-delete="${escapeHtml(item.id)}">删除</button>
+                                    </div>
+                                </article>
+                            `).join("") || `<div class="mis-empty">暂无公告</div>`}
+                        </div>
+                    </section>
+                </section>
+            `;
+            bindFrontNoticeAdminEvents(route, user);
+        } catch (error) {
+            panel.innerHTML = `<div class="mis-error">${escapeHtml(error.message)}</div>`;
+        }
+    }
+
+    function noticeTypeLabel(value) {
+        return ({ SYSTEM: "系统公告", ADOPTION: "认养公告", FOLLOWUP: "回访提醒" })[value] || value || "-";
+    }
+
+    function noticeStatusLabel(value) {
+        return ({ DRAFT: "草稿", PUBLISHED: "已发布", OFFLINE: "已下架" })[value] || value || "-";
+    }
+
+    function noticeRoleOptions() {
+        return [
+            { value: "STUDENT", label: "普通用户" },
+            { value: "VOLUNTEER", label: "志愿者" },
+            { value: "HOSPITAL", label: "合作医院" },
+            { value: "ADMIN", label: "管理员" }
+        ];
+    }
+
+    function noticeRoleEmoji(value) {
+        return ({ STUDENT: "😺", VOLUNTEER: "😻", HOSPITAL: "😽", ADMIN: "😼" })[value] || "😺";
+    }
+
+    function noticeTargetRoleSet(value) {
+        const roles = String(value || "STUDENT,VOLUNTEER,HOSPITAL,ADMIN").split(",").map(item => item.trim().toUpperCase()).filter(Boolean);
+        return new Set(roles.length ? roles : noticeRoleOptions().map(item => item.value));
+    }
+
+    function noticeRoleText(value) {
+        const selected = noticeTargetRoleSet(value);
+        const labels = noticeRoleOptions().filter(item => selected.has(item.value)).map(item => item.label);
+        return labels.length === noticeRoleOptions().length ? "全部角色" : labels.join("、");
+    }
+
+    function frontNoticeBaseHash() {
+        const next = new URLSearchParams();
+        const status = document.getElementById("front-notice-status")?.value;
+        const type = document.getElementById("front-notice-type")?.value;
+        if (status) next.set("publishStatus", status);
+        if (type) next.set("noticeType", type);
+        return `#/admin-notices${next.toString() ? `?${next}` : ""}`;
+    }
+
+    function bindFrontNoticeAdminEvents(route, user) {
+        document.getElementById("front-notice-filter").addEventListener("click", () => {
+            window.location.hash = frontNoticeBaseHash();
+        });
+        const imageUrlInput = document.getElementById("front-notice-image-url");
+        const imagePreview = document.getElementById("front-notice-image-preview");
+        const uploadMessage = document.getElementById("front-notice-upload-message");
+        document.getElementById("front-notice-upload-image")?.addEventListener("click", async () => {
+            const file = document.getElementById("front-notice-image-file")?.files?.[0];
+            if (!file) {
+                uploadMessage.textContent = "请先选择一张图片";
+                return;
+            }
+            const button = document.getElementById("front-notice-upload-image");
+            button.disabled = true;
+            uploadMessage.textContent = "正在上传 0%";
+            try {
+                const result = await uploadFileWithProgress("/api/uploads/notices", file, percent => {
+                    uploadMessage.textContent = `正在上传 ${percent}%`;
+                });
+                imageUrlInput.value = result.url;
+                imagePreview.src = result.url;
+                uploadMessage.textContent = "图片已上传，保存公告后生效";
+            } catch (error) {
+                uploadMessage.textContent = error.message;
+            } finally {
+                button.disabled = false;
+            }
+        });
+        document.getElementById("front-notice-clear-image")?.addEventListener("click", () => {
+            imageUrlInput.value = "";
+            imagePreview.src = noticeMeta({}).image;
+            uploadMessage.textContent = "已移除图片，保存公告后生效";
+        });
+        shell.querySelectorAll('input[name="targetRoles"]').forEach(input => {
+            input.addEventListener("change", () => {
+                const checked = shell.querySelectorAll('input[name="targetRoles"]:checked');
+                if (!checked.length) {
+                    input.checked = true;
+                    const message = document.getElementById("front-notice-message");
+                    if (message) message.textContent = "发布范围至少选择一个角色";
+                }
+            });
+        });
+        document.getElementById("front-notice-form").addEventListener("submit", async event => {
+            event.preventDefault();
+            const form = new FormData(event.currentTarget);
+            const id = form.get("id");
+            const message = document.getElementById("front-notice-message");
+            const targetRoles = form.getAll("targetRoles").join(",");
+            if (!targetRoles) {
+                message.textContent = "请至少选择一个发布范围";
+                return;
+            }
+            const body = {
+                title: form.get("title"),
+                content: form.get("content"),
+                noticeType: form.get("noticeType"),
+                publishStatus: form.get("publishStatus"),
+                sortOrder: Number(form.get("sortOrder") || 0),
+                imageUrl: form.get("imageUrl"),
+                targetRoles,
+                sendMessage: Boolean(form.get("sendMessage"))
+            };
+            try {
+                message.textContent = "正在保存...";
+                await api(id ? `/api/admin/notices/${id}` : "/api/admin/notices", {
+                    method: id ? "PUT" : "POST",
+                    body: JSON.stringify(body)
+                });
+                message.textContent = "公告已保存";
+                window.location.hash = "#/admin-notices";
+                renderFrontAdminNotices(route, user);
+            } catch (error) {
+                message.textContent = error.message;
+            }
+        });
+        shell.querySelectorAll("[data-front-notice-publish]").forEach(button => button.addEventListener("click", async () => {
+            await runFrontNoticeAction(button, "正在发布...", "公告已发布", async () => {
+                await api(`/api/admin/notices/${button.dataset.frontNoticePublish}/publish`, { method: "PUT" });
+            }, route, user);
+        }));
+        shell.querySelectorAll("[data-front-notice-offline]").forEach(button => button.addEventListener("click", async () => {
+            await runFrontNoticeAction(button, "正在下架...", "公告已下架", async () => {
+                await api(`/api/admin/notices/${button.dataset.frontNoticeOffline}/offline`, { method: "PUT" });
+            }, route, user);
+        }));
+        shell.querySelectorAll("[data-front-notice-delete]").forEach(button => button.addEventListener("click", async () => {
+            if (!confirm("确认删除该公告？")) return;
+            await runFrontNoticeAction(button, "正在删除...", "公告已删除", async () => {
+                await api(`/api/admin/notices/${button.dataset.frontNoticeDelete}`, { method: "DELETE" });
+            }, route, user);
+        }));
+    }
+
+    async function runFrontNoticeAction(button, pendingText, doneText, action, route, user) {
+        const oldText = button.textContent;
+        const message = document.getElementById("front-notice-message") || document.getElementById("front-notice-upload-message");
+        button.disabled = true;
+        button.textContent = pendingText;
+        if (message) message.textContent = pendingText;
+        try {
+            await action();
+            if (message) message.textContent = doneText;
+            await renderFrontAdminNotices(route, user);
+        } catch (error) {
+            button.disabled = false;
+            button.textContent = oldText;
+            if (message) message.textContent = error.message;
+        }
     }
 
     async function renderAdminDicts(route, user) {
@@ -3839,7 +4663,12 @@ ${detail.agreementContent || "-"}`;
             return;
         }
 
-        if (!isAdmin && route.roles && user && !canVisit(route, user.role)) {
+        if (!isAdmin && route.roles && !user) {
+            window.location.hash = loginHashFor(hash);
+            return;
+        }
+
+        if (!isAdmin && user && !canVisit(route, user.role)) {
             renderForbidden(user);
             return;
         }
@@ -3877,6 +4706,12 @@ ${detail.agreementContent || "-"}`;
             renderMyFollowups(route, user);
         } else if (route.path === "#/my/messages") {
             renderMyMessages(route, user);
+        } else if (route.path === "#/volunteer/clues") {
+            renderAdminClues(route, user);
+        } else if (route.path === "#/volunteer/followups") {
+            renderAdminFollowups(route, user);
+        } else if (route.path === "#/admin-notices") {
+            renderFrontAdminNotices(route, user);
         } else if (route.path === "#/hospital") {
             renderHospitalPortal(route, user);
         } else if (route.path === "#/profile") {

@@ -19,7 +19,9 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class CatAdoptionService {
@@ -361,8 +363,14 @@ public class CatAdoptionService {
         }
         LocalDateTime now = LocalDateTime.now();
         catMapper.updateStatus(catId, request.targetStatus(), now);
-        logOperation(currentUser(), request.targetStatus() == CatStatus.ADOPTABLE ? "发布猫咪认养" : "更新猫咪状态",
+        User operator = currentUser();
+        logOperation(operator, request.targetStatus() == CatStatus.ADOPTABLE ? "发布猫咪认养" : "更新猫咪状态",
                 "CAT", catId, cat.status().name(), request.targetStatus().name(), request.reason());
+        if (request.targetStatus() == CatStatus.MEDICAL && cat.status() != CatStatus.MEDICAL) {
+            sendMessageToRole(Role.HOSPITAL, "新的医疗协作任务",
+                    "猫咪 " + valueOrDefault(cat.catName(), catId) + " 已进入医疗中状态，请合作医院在医疗工作台处理。",
+                    "CAT", catId, operator, operator.userId());
+        }
         return findCat(catId);
     }
 
@@ -384,6 +392,9 @@ public class CatAdoptionService {
     public Clue submitClue(ClueSubmitRequest request) {
         validateClueRequest(request);
         User user = findUser(AuthContext.userId());
+        if (user.role() != Role.STUDENT) {
+            throw new BusinessException("只有普通用户可以提交猫咪线索");
+        }
         LocalDateTime now = LocalDateTime.now();
         String clueIdPrefix = "RP" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyMMdd"));
         String clueId = codeGenerator.nextAfter("RP", rescueReportMapper.maxSuffixByPrefix(clueIdPrefix));
@@ -394,6 +405,9 @@ public class CatAdoptionService {
                 ClueStatus.PENDING_VERIFY, now);
         logOperation(user, "提交猫咪线索", "CLUE", clueId, null, ClueStatus.PENDING_VERIFY.name(), request.foundLocation());
         sendMessage(user.userId(), "线索提交成功", "你的猫咪线索已提交，志愿者将尽快核实。", "CLUE", clueId, user);
+        sendMessageToRole(Role.VOLUNTEER, "新的线索待审核",
+                "有一条新的猫咪线索需要核实，地点：" + request.foundLocation() + "。请在前台“线索审核”中处理。",
+                "CLUE", clueId, user, null);
         return findClue(clueId);
     }
 
@@ -471,6 +485,9 @@ public class CatAdoptionService {
         if (clue.reporterId() != null) {
             sendMessage(clue.reporterId(), "线索核实结果", "你的线索核实结果为：" + nextStatus.name(), "CLUE", clueId, operator);
         }
+        sendMessage(operator.userId(), "感谢完成线索审核",
+                "你已完成线索 " + clue.clueNo() + " 的核实处理，系统已记录结果。",
+                "CLUE", clueId, operator);
         return findClue(clueId);
     }
 
@@ -499,6 +516,14 @@ public class CatAdoptionService {
         logOperation(operator, "新增猫咪档案", "CAT", catId, null, CatStatus.OBSERVING.name(), "来源线索：" + clueId);
         if (clue.reporterId() != null) {
             sendMessage(clue.reporterId(), "线索已生成猫咪档案", "你的线索已生成猫咪档案：" + cat.catName(), "CAT", catId, operator);
+        }
+        sendMessage(operator.userId(), "感谢完成线索建档",
+                "你已将线索 " + clue.clueNo() + " 转为猫咪档案，系统已记录建档结果。",
+                "CAT", catId, operator);
+        if (healthLevel == HealthLevel.C) {
+            sendMessageToRole(Role.HOSPITAL, "新的医疗协作任务",
+                    "猫咪 " + cat.catName() + " 建档时标记为需治疗，请合作医院在医疗工作台处理。",
+                    "CAT", catId, operator, null);
         }
         return cat;
     }
@@ -532,7 +557,7 @@ public class CatAdoptionService {
         MedicalRecord record = new MedicalRecord(codeGenerator.next("MD"), request.catId(),
                 request.checkDate() == null ? LocalDate.now() : request.checkDate(), request.hospital(),
                 request.healthLevel(), request.vaccinated(), request.sterilized(), request.treatment(),
-                request.doctorNote(), LocalDateTime.now());
+                request.doctorNote(), null, LocalDateTime.now());
         medicalRecordMapper.insert(record);
 
         CatStatus nextStatus = request.healthLevel() == HealthLevel.C ? CatStatus.MEDICAL : cat.status();
@@ -592,6 +617,11 @@ public class CatAdoptionService {
         catMapper.updateHealth(catId, healthLevel, sterilized, vaccinated, nextStatus, now);
         logOperation(operator, "新增医疗记录", "CAT", catId, cat.status().name(), nextStatus.name(),
                 normalizeRecordType(request.recordType()) + "；" + request.description());
+        if (operator.role() == Role.HOSPITAL) {
+            sendMessage(operator.userId(), "感谢完成医疗记录",
+                    "你已完成猫咪 " + valueOrDefault(cat.catName(), catId) + " 的医疗记录录入，系统已同步健康状态。",
+                    "MEDICAL", medicalId, operator);
+        }
         return medicalRecordMapper.findAll(catId).stream()
                 .filter(record -> record.medicalId().equals(medicalId))
                 .findFirst()
@@ -620,6 +650,11 @@ public class CatAdoptionService {
         CatStatus nextStatus = (healthLevel == HealthLevel.C || request.abnormalFlag()) ? CatStatus.MEDICAL : cat.status();
         catMapper.updateHealth(old.catId(), healthLevel, sterilized, vaccinated, nextStatus, now);
         logOperation(operator, "编辑医疗记录", "MEDICAL", medicalId, old.healthLevel().name(), healthLevel.name(), request.description());
+        if (operator.role() == Role.HOSPITAL) {
+            sendMessage(operator.userId(), "感谢更新医疗记录",
+                    "你已更新猫咪 " + valueOrDefault(cat.catName(), old.catId()) + " 的医疗记录，系统已同步健康状态。",
+                    "MEDICAL", medicalId, operator);
+        }
         return getMedicalRecord(medicalId);
     }
 
@@ -657,8 +692,8 @@ public class CatAdoptionService {
     public ApplicationReviewDetail submitAdoptionApplication(AdoptionApplicationRequest request) {
         validateAdoptionApplicationRequest(request);
         User user = currentUser();
-        if (user.role() != Role.STUDENT && user.role() != Role.VOLUNTEER) {
-            throw new BusinessException("只有普通用户或志愿者可以提交认养申请");
+        if (user.role() != Role.STUDENT) {
+            throw new BusinessException("只有普通用户可以提交认养申请");
         }
         Cat cat = findCat(request.catId());
         if (cat.status() != CatStatus.ADOPTABLE) {
@@ -679,6 +714,9 @@ public class CatAdoptionService {
         logOperation(user, "提交认养申请", "APPLICATION", applicationId, null, ApplicationStatus.PENDING_INITIAL.name(),
                 "score=" + score.score() + "; risk=" + score.riskLevel());
         sendMessage(user.userId(), "认养申请提交成功", "你的认养申请已提交，当前状态为待初审。", "APPLICATION", applicationId, user);
+        sendMessageToRole(Role.VOLUNTEER, "新的认养初审任务",
+                "申请 " + applicationId + " 正在等待志愿者初审，请在“认养初审”中处理。",
+                "APPLICATION", applicationId, user, null);
         return getApplicationReviewDetail(applicationId, true);
     }
 
@@ -931,33 +969,71 @@ public class CatAdoptionService {
         if (!task.adopterId().equals(AuthContext.userId())) {
             throw new BusinessException("You can only submit your own follow-up task");
         }
-        if (!"PENDING".equals(task.status()) && !"OVERDUE".equals(task.status())) {
-            throw new BusinessException("This follow-up task cannot be submitted repeatedly");
-        }
-        if (followupTaskMapper.countRecordByTaskId(id) > 0) {
-            throw new BusinessException("This follow-up task already has a submitted record");
-        }
+        return submitFollowupRecordInternal(id, request, false);
+    }
+
+    public List<FollowupRecordInfo> listMyFollowupRecords(Long id) {
+        FollowupTaskInfo task = getMyFollowupTask(id);
+        return followupTaskMapper.findRecordsByTaskId(task.id());
+    }
+
+    private FollowupTaskInfo submitFollowupRecordInternal(Long id, FollowupRecordSubmitRequest request, boolean staffRecord) {
         if (request.abnormalFlag() && isBlank(request.abnormalDesc())) {
             throw new BusinessException("Abnormal description is required");
         }
+        FollowupTaskInfo task = requireFollowupTask(id);
+        if ("COMPLETED".equals(task.status())) {
+            throw new BusinessException("Completed follow-up tasks cannot be edited");
+        }
         User operator = currentUser();
         LocalDateTime now = LocalDateTime.now();
-        FollowupTaskStatus nextStatus = request.abnormalFlag() ? FollowupTaskStatus.ABNORMAL : FollowupTaskStatus.COMPLETED;
+        String sourceLabel = staffRecord
+                ? (operator.role() == Role.ADMIN ? "管理员回访记录" : "志愿者回访记录")
+                : "认养人猫咪状态记录";
+        String content = "[" + sourceLabel + "] " + request.content();
+        String volunteerComment = staffRecord ? "记录人：" + operator.userName() : null;
+        FollowupTaskStatus nextStatus = nextFollowupStatus(task.status(), request.abnormalFlag());
         followupTaskMapper.insertRecord(id, task.applicationId(), task.agreementId(), task.catId(), task.adopterId(),
-                request.content(), request.catCondition(), request.environmentDesc(), request.photoUrl(),
-                request.abnormalFlag(), request.abnormalDesc(), null, operator.userId(), now);
+                content, request.catCondition(), request.environmentDesc(), request.photoUrl(),
+                request.abnormalFlag(), request.abnormalDesc(), volunteerComment, operator.userId(), now);
         followupTaskMapper.updateTaskStatus(id, nextStatus, now.toLocalDate(), request.abnormalFlag(),
-                null, operator.userId(), now);
+                staffRecord ? operator.userId() : task.handlerId(), operator.userId(), now);
         if (request.abnormalFlag()) {
             createFollowupWarning(task, "FOLLOWUP_ABNORMAL", "HIGH", request.abnormalDesc(), operator);
-            sendMessage(task.adopterId(), "异常回访已提交", "异常回访已提交，管理员将跟进处理。", "FOLLOWUP", String.valueOf(id), operator);
+            sendMessage(task.adopterId(), "异常回访已记录", sourceLabel + "已记录异常情况，志愿者或管理员将继续跟进。", "FOLLOWUP", String.valueOf(id), operator);
+            if (staffRecord && operator.role() == Role.VOLUNTEER) {
+                sendMessage(operator.userId(), "感谢完成异常回访记录",
+                        "你已完成猫咪 " + valueOrDefault(task.catName(), task.catId()) + " 的异常回访记录，系统已生成预警。",
+                        "FOLLOWUP", String.valueOf(id), operator);
+            }
+        } else if (staffRecord) {
+            sendMessage(task.adopterId(), "回访记录已更新", sourceLabel + "已补充到你的回访任务中。", "FOLLOWUP", String.valueOf(id), operator);
+            if (operator.role() == Role.VOLUNTEER) {
+                sendMessage(operator.userId(), "感谢完成回访任务",
+                        "你已完成猫咪 " + valueOrDefault(task.catName(), task.catId()) + " 的回访记录，系统已同步任务状态。",
+                        "FOLLOWUP", String.valueOf(id), operator);
+            }
         } else {
-            sendMessage(task.adopterId(), "回访提交成功", "本次回访已完成，感谢配合。", "FOLLOWUP", String.valueOf(id), operator);
+            sendMessage(task.adopterId(), "猫咪状态已上传", "你上传的猫咪状态已保存到回访记录。", "FOLLOWUP", String.valueOf(id), operator);
         }
-        logOperation(operator, "Submit follow-up record", "FOLLOWUP_TASK", String.valueOf(id),
+        logOperation(operator, staffRecord ? "Submit staff follow-up record" : "Submit adopter follow-up record",
+                "FOLLOWUP_TASK", String.valueOf(id),
                 task.status(), nextStatus.name(), request.abnormalFlag() ? request.abnormalDesc() : request.content());
         maybeMarkCatAdopted(task.catId(), operator);
         return requireFollowupTask(id);
+    }
+
+    private FollowupTaskStatus nextFollowupStatus(String currentStatus, boolean abnormalFlag) {
+        if (abnormalFlag) {
+            return FollowupTaskStatus.ABNORMAL;
+        }
+        if ("PENDING".equals(currentStatus) || "OVERDUE".equals(currentStatus)) {
+            return FollowupTaskStatus.COMPLETED;
+        }
+        if ("ABNORMAL".equals(currentStatus)) {
+            return FollowupTaskStatus.ABNORMAL;
+        }
+        return FollowupTaskStatus.COMPLETED;
     }
 
     public List<FollowupTaskInfo> listAdminFollowupTasks(FollowupTaskStatus status, LocalDate planDate, String keyword) {
@@ -973,6 +1049,17 @@ public class CatAdoptionService {
 
     public FollowupTaskInfo getAdminFollowupTask(Long id) {
         return requireFollowupTask(id);
+    }
+
+    public List<FollowupRecordInfo> listAdminFollowupRecords(Long id) {
+        requireFollowupTask(id);
+        return followupTaskMapper.findRecordsByTaskId(id);
+    }
+
+    @Transactional
+    public FollowupTaskInfo submitAdminFollowupRecord(Long id, FollowupRecordSubmitRequest request) {
+        validateFollowupSubmitRequest(request);
+        return submitFollowupRecordInternal(id, request, true);
     }
 
     @Transactional
@@ -991,6 +1078,11 @@ public class CatAdoptionService {
         createFollowupWarning(task, "FOLLOWUP_ABNORMAL", "HIGH", abnormalDesc, operator);
         logOperation(operator, "Mark follow-up abnormal", "FOLLOWUP_TASK", String.valueOf(id),
                 task.status(), FollowupTaskStatus.ABNORMAL.name(), abnormalDesc);
+        if (operator.role() == Role.VOLUNTEER) {
+            sendMessage(operator.userId(), "感谢处理异常回访",
+                    "你已标记并记录异常回访，系统已生成预警并同步任务状态。",
+                    "FOLLOWUP", String.valueOf(id), operator);
+        }
         return requireFollowupTask(id);
     }
 
@@ -1043,6 +1135,9 @@ public class CatAdoptionService {
     @Transactional
     public AdoptionApplication submitApplication(ApplicationRequest request) {
         User user = findUser(AuthContext.userId());
+        if (user.role() != Role.STUDENT) {
+            throw new BusinessException("只有普通用户可以提交认养申请");
+        }
         Cat cat = findCat(request.catId());
         if (cat.status() != CatStatus.ADOPTABLE) {
             throw new BusinessException("当前猫咪不处于可认养状态");
@@ -1057,6 +1152,9 @@ public class CatAdoptionService {
                 request.promiseAccepted(), ApplicationStatus.PENDING, null, null, null, LocalDateTime.now(), null, null);
         applicationMapper.insert(application);
         log(user.userName(), "提交认养申请", "APPLICATION", application.applicationId(), cat.catName());
+        sendMessageToRole(Role.VOLUNTEER, "新的认养初审任务",
+                "申请 " + applicationId + " 正在等待志愿者初审，请在“认养初审”中处理。",
+                "APPLICATION", applicationId, user, null);
         return application;
     }
 
@@ -1149,7 +1247,7 @@ public class CatAdoptionService {
     @Transactional
     public Notice createNotice(NoticeRequest request) {
         Notice notice = new Notice(codeGenerator.next("NT"), request.title(), request.content(), request.publisher(),
-                request.pinned(), request.enabled(), LocalDateTime.now());
+                request.pinned(), request.enabled(), LocalDateTime.now(), null, defaultNoticeTargetRoles());
         noticeMapper.insert(notice);
         log(request.publisher(), "发布公告", "NOTICE", notice.noticeId(), notice.title());
         return notice;
@@ -1171,7 +1269,7 @@ public class CatAdoptionService {
     public Notice updateNotice(String noticeId, NoticeRequest request) {
         Notice old = getNotice(noticeId);
         Notice updated = new Notice(noticeId, request.title(), request.content(), request.publisher(),
-                request.pinned(), request.enabled(), old.publishedAt());
+                request.pinned(), request.enabled(), old.publishedAt(), old.imageUrl(), old.targetRoles());
         noticeMapper.update(updated);
         log(request.publisher(), "更新公告", "NOTICE", noticeId, request.title());
         return getNotice(noticeId);
@@ -1521,15 +1619,18 @@ public class CatAdoptionService {
     @Transactional
     public Notice createAdminNotice(NoticeAdminRequest request) {
         User operator = currentUser();
+        String targetRoles = normalizeNoticeTargetRoles(request.targetRoles());
         Notice notice = new Notice(codeGenerator.next("NT"), request.title(), request.content(), operator.userName(),
                 false, "PUBLISHED".equals(valueOrDefault(request.publishStatus(), "DRAFT")),
-                "PUBLISHED".equals(request.publishStatus()) ? LocalDateTime.now() : null);
+                "PUBLISHED".equals(request.publishStatus()) ? LocalDateTime.now() : null,
+                blankToNull(request.imageUrl()), targetRoles);
         noticeMapper.insert(notice);
         noticeMapper.updateAdminFields(notice.noticeId(), valueOrDefault(request.noticeType(), "SYSTEM"),
-                valueOrDefault(request.publishStatus(), "DRAFT"), operator.userId(), request.sortOrder(), LocalDateTime.now());
+                valueOrDefault(request.publishStatus(), "DRAFT"), operator.userId(), request.sortOrder(),
+                blankToNull(request.imageUrl()), targetRoles, LocalDateTime.now());
         logOperation(operator, "Create notice", "NOTICE", notice.noticeId(), null, request.publishStatus(), request.title());
         if (Boolean.TRUE.equals(request.sendMessage())) {
-            broadcastMessage("公告发布：" + request.title(), request.content(), "NOTICE", notice.noticeId(), operator);
+            broadcastMessageToRoles(targetRoles, "公告发布：" + request.title(), request.content(), "NOTICE", notice.noticeId(), operator);
         }
         return getNotice(notice.noticeId());
     }
@@ -1538,12 +1639,17 @@ public class CatAdoptionService {
     public Notice updateAdminNotice(String noticeId, NoticeAdminRequest request) {
         Notice old = getNotice(noticeId);
         User operator = currentUser();
+        String targetRoles = normalizeNoticeTargetRoles(request.targetRoles());
         noticeMapper.update(new Notice(noticeId, request.title(), request.content(), operator.userName(),
-                old.pinned(), "PUBLISHED".equals(valueOrDefault(request.publishStatus(), "DRAFT")), old.publishedAt()));
+                old.pinned(), "PUBLISHED".equals(valueOrDefault(request.publishStatus(), "DRAFT")), old.publishedAt(),
+                blankToNull(request.imageUrl()), targetRoles));
         noticeMapper.updateAdminFields(noticeId, valueOrDefault(request.noticeType(), "SYSTEM"),
                 valueOrDefault(request.publishStatus(), old.enabled() ? "PUBLISHED" : "DRAFT"), operator.userId(),
-                request.sortOrder(), LocalDateTime.now());
+                request.sortOrder(), blankToNull(request.imageUrl()), targetRoles, LocalDateTime.now());
         logOperation(operator, "Update notice", "NOTICE", noticeId, old.title(), request.title(), request.noticeType());
+        if (Boolean.TRUE.equals(request.sendMessage()) && "PUBLISHED".equals(valueOrDefault(request.publishStatus(), "DRAFT"))) {
+            broadcastMessageToRoles(targetRoles, "公告更新：" + request.title(), request.content(), "NOTICE", noticeId, operator);
+        }
         return getNotice(noticeId);
     }
 
@@ -1662,7 +1768,7 @@ public class CatAdoptionService {
     }
 
     public String exportFollowupsCsv(String status, String taskType, String planDate, String keyword) {
-        LocalDate date = isBlank(planDate) ? null : LocalDate.parse(planDate);
+        LocalDate date = parseDateOrNull(planDate);
         List<FollowupTaskInfo> tasks = followupTaskMapper.findTasks(null, null, null, parseFollowupTaskStatus(status),
                 blankToNull(taskType), date, blankToNull(keyword));
         List<List<?>> rows = new ArrayList<>();
@@ -1789,34 +1895,64 @@ public class CatAdoptionService {
         logOperation(operator, "Create follow-up tasks", "FOLLOWUP_TASK", row.applicationId(),
                 null, "DAY_7,DAY_30,DAY_90", "agreementId=" + agreementId);
         sendMessage(row.userId(), "回访任务已生成", "系统已生成 7/30/90 天回访任务，请按时提交反馈。", "FOLLOWUP", row.applicationId(), operator);
+        sendMessageToRole(Role.VOLUNTEER, "新的回访任务待处理",
+                "申请 " + row.applicationId() + " 已完成交接，系统已生成 7/30/90 天回访任务，请在前台“回访任务”中跟进。",
+                "FOLLOWUP", row.applicationId(), operator, null);
     }
 
     private CatStatus parseCatStatus(String value) {
         if (isBlank(value)) {
             return null;
         }
-        return CatStatus.valueOf(value.trim().toUpperCase());
+        try {
+            return CatStatus.valueOf(value.trim().toUpperCase());
+        } catch (IllegalArgumentException error) {
+            return null;
+        }
     }
 
     private HealthLevel parseHealthLevel(String value) {
         if (isBlank(value)) {
             return null;
         }
-        return HealthLevel.valueOf(value.trim().toUpperCase());
+        try {
+            return HealthLevel.valueOf(value.trim().toUpperCase());
+        } catch (IllegalArgumentException error) {
+            return null;
+        }
     }
 
     private ApplicationStatus parseApplicationStatus(String value) {
         if (isBlank(value)) {
             return null;
         }
-        return ApplicationStatus.valueOf(value.trim().toUpperCase());
+        try {
+            return ApplicationStatus.valueOf(value.trim().toUpperCase());
+        } catch (IllegalArgumentException error) {
+            return null;
+        }
     }
 
     private FollowupTaskStatus parseFollowupTaskStatus(String value) {
         if (isBlank(value)) {
             return null;
         }
-        return FollowupTaskStatus.valueOf(value.trim().toUpperCase());
+        try {
+            return FollowupTaskStatus.valueOf(value.trim().toUpperCase());
+        } catch (IllegalArgumentException error) {
+            return null;
+        }
+    }
+
+    private LocalDate parseDateOrNull(String value) {
+        if (isBlank(value)) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(value.trim());
+        } catch (Exception error) {
+            return null;
+        }
     }
 
     private String toCsv(List<List<?>> rows) {
@@ -1849,6 +1985,63 @@ public class CatAdoptionService {
 
     private void broadcastMessage(String title, String content, String bizType, String bizId, User operator) {
         for (User user : userMapper.findAll()) {
+            sendMessage(user.userId(), title, content, bizType, bizId, operator);
+        }
+    }
+
+    private void broadcastMessageToRoles(String roles, String title, String content, String bizType, String bizId, User operator) {
+        Set<Role> targetRoles = parseNoticeTargetRoles(roles);
+        if (targetRoles.isEmpty()) {
+            broadcastMessage(title, content, bizType, bizId, operator);
+            return;
+        }
+        Set<String> sent = new LinkedHashSet<>();
+        for (Role role : targetRoles) {
+            for (User user : userMapper.findAdminUsers(role, true, null)) {
+                if (sent.add(user.userId())) {
+                    sendMessage(user.userId(), title, content, bizType, bizId, operator);
+                }
+            }
+        }
+    }
+
+    private String defaultNoticeTargetRoles() {
+        return "STUDENT,VOLUNTEER,HOSPITAL,ADMIN";
+    }
+
+    private String normalizeNoticeTargetRoles(String roles) {
+        Set<Role> parsed = parseNoticeTargetRoles(roles);
+        if (parsed.isEmpty()) {
+            return defaultNoticeTargetRoles();
+        }
+        return String.join(",", parsed.stream().map(Role::name).toList());
+    }
+
+    private Set<Role> parseNoticeTargetRoles(String roles) {
+        Set<Role> parsed = new LinkedHashSet<>();
+        if (roles == null || roles.isBlank()) {
+            return parsed;
+        }
+        for (String item : roles.split(",")) {
+            String value = item.trim().toUpperCase();
+            if (value.isEmpty() || "ALL".equals(value)) {
+                continue;
+            }
+            try {
+                parsed.add(Role.valueOf(value));
+            } catch (IllegalArgumentException ignored) {
+                // Ignore stale role values from older clients.
+            }
+        }
+        return parsed;
+    }
+
+    private void sendMessageToRole(Role role, String title, String content, String bizType, String bizId,
+                                   User operator, String excludeUserId) {
+        for (User user : userMapper.findAdminUsers(role, true, null)) {
+            if (!isBlank(excludeUserId) && excludeUserId.equals(user.userId())) {
+                continue;
+            }
             sendMessage(user.userId(), title, content, bizType, bizId, operator);
         }
     }
@@ -2027,6 +2220,20 @@ public class CatAdoptionService {
         sendMessage(row.userId(), stage.equals("INITIAL") ? "认养申请初审结果" : "认养申请终审结果",
                 "你的认养申请状态已更新为：" + nextStatus.name() + "。审核意见：" + valueOrDefault(comment, ""),
                 "APPLICATION", row.applicationId(), operator);
+        if ("INITIAL".equals(stage)) {
+            sendMessage(operator.userId(), "感谢完成认养初审",
+                    "你已完成申请 " + row.applicationId() + " 的初审，系统已记录处理结果。",
+                    "APPLICATION", row.applicationId(), operator);
+            if (nextStatus == ApplicationStatus.PENDING_FINAL) {
+                sendMessageToRole(Role.ADMIN, "新的认养终审任务",
+                        "申请 " + row.applicationId() + " 已通过初审，等待管理员终审。",
+                        "APPLICATION", row.applicationId(), operator, null);
+            }
+        } else if ("FINAL".equals(stage)) {
+            sendMessage(operator.userId(), "感谢完成认养终审",
+                    "你已完成申请 " + row.applicationId() + " 的终审，系统已记录处理结果。",
+                    "APPLICATION", row.applicationId(), operator);
+        }
         return getApplicationReviewDetail(row.applicationId(), true);
     }
 

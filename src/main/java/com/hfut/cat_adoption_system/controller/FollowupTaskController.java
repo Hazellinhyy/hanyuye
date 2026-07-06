@@ -3,6 +3,7 @@ package com.hfut.cat_adoption_system.controller;
 import com.hfut.cat_adoption_system.auth.RequireRole;
 import com.hfut.cat_adoption_system.common.ApiResponse;
 import com.hfut.cat_adoption_system.dto.FollowupAbnormalRequest;
+import com.hfut.cat_adoption_system.dto.FollowupRecordInfo;
 import com.hfut.cat_adoption_system.dto.FollowupRecordSubmitRequest;
 import com.hfut.cat_adoption_system.dto.FollowupRefreshResult;
 import com.hfut.cat_adoption_system.dto.FollowupTaskInfo;
@@ -30,19 +31,28 @@ public class FollowupTaskController {
     }
 
     @GetMapping("/api/my/followup/tasks")
+    @RequireRole(Role.STUDENT)
     public ApiResponse<List<FollowupTaskInfo>> myTasks(@RequestParam(required = false) FollowupTaskStatus status) {
         return ApiResponse.ok(service.listMyFollowupTasks(status));
     }
 
     @GetMapping("/api/my/followup/tasks/{id}")
+    @RequireRole(Role.STUDENT)
     public ApiResponse<FollowupTaskInfo> myTask(@PathVariable Long id) {
         return ApiResponse.ok(service.getMyFollowupTask(id));
     }
 
     @PostMapping("/api/my/followup/tasks/{id}/records")
+    @RequireRole(Role.STUDENT)
     public ApiResponse<FollowupTaskInfo> submitRecord(@PathVariable Long id,
                                                        @Valid @RequestBody FollowupRecordSubmitRequest request) {
         return ApiResponse.created(service.submitFollowupRecord(id, request));
+    }
+
+    @GetMapping("/api/my/followup/tasks/{id}/records")
+    @RequireRole(Role.STUDENT)
+    public ApiResponse<List<FollowupRecordInfo>> myRecords(@PathVariable Long id) {
+        return ApiResponse.ok(service.listMyFollowupRecords(id));
     }
 
     @GetMapping("/api/admin/followup/tasks")
@@ -58,6 +68,19 @@ public class FollowupTaskController {
     @RequireRole({Role.VOLUNTEER, Role.ADMIN})
     public ApiResponse<FollowupTaskInfo> adminTask(@PathVariable Long id) {
         return ApiResponse.ok(service.getAdminFollowupTask(id));
+    }
+
+    @GetMapping("/api/admin/followup/tasks/{id}/records")
+    @RequireRole({Role.VOLUNTEER, Role.ADMIN})
+    public ApiResponse<List<FollowupRecordInfo>> adminRecords(@PathVariable Long id) {
+        return ApiResponse.ok(service.listAdminFollowupRecords(id));
+    }
+
+    @PostMapping("/api/admin/followup/tasks/{id}/records")
+    @RequireRole({Role.VOLUNTEER, Role.ADMIN})
+    public ApiResponse<FollowupTaskInfo> submitAdminRecord(@PathVariable Long id,
+                                                           @Valid @RequestBody FollowupRecordSubmitRequest request) {
+        return ApiResponse.created(service.submitAdminFollowupRecord(id, request));
     }
 
     @PutMapping("/api/admin/followup/tasks/{id}/mark-abnormal")

@@ -8,6 +8,8 @@ public record NoticeAdminRequest(
         String noticeType,
         String publishStatus,
         Integer sortOrder,
+        String imageUrl,
+        String targetRoles,
         Boolean sendMessage
 ) {
 }

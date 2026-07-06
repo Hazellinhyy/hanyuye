@@ -16,6 +16,9 @@ public record FollowupRecordInfo(
         Boolean abnormalFlag,
         String abnormalDesc,
         String volunteerComment,
+        String submitterId,
+        String submitterName,
+        String submitterRole,
         LocalDateTime submitTime
 ) {
 }
