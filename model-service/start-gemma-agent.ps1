@@ -18,4 +18,5 @@ if (-not (Test-Path $model)) {
     --port 9100 `
     --ctx-size 4096 `
     --threads 6 `
+    --verbose `
     --no-webui

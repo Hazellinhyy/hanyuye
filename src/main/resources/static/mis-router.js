@@ -5,6 +5,831 @@
     }
 
     let screenClockTimer = null;
+    let localeObserver = null;
+    const localeStorageKey = "hfut-cat-locale";
+    const supportedLocales = {
+        zh: "中文",
+        en: "English",
+        ja: "日本語",
+        ko: "한국어"
+    };
+    let currentLocale = localStorage.getItem(localeStorageKey) || "zh";
+    const nativeAlert = window.alert.bind(window);
+    const nativeConfirm = window.confirm.bind(window);
+    const nativePrompt = window.prompt.bind(window);
+
+    const i18nPacks = {
+        en: {
+            "后台管理系统": "Admin System",
+            "校园流浪猫认养门户": "Campus Stray Cat Adoption Portal",
+            "返回前台": "Front Portal",
+            "退出": "Log out",
+            "登录": "Log in",
+            "注册": "Register",
+            "后台": "Admin",
+            "门户首页": "Portal",
+            "数据大屏": "Data Screen",
+            "可认养猫咪": "Adoptable Cats",
+            "公告": "Notices",
+            "上报线索": "Submit Clue",
+            "我的线索": "My Clues",
+            "我的申请": "My Applications",
+            "我的回访": "My Follow-ups",
+            "我的消息": "Messages",
+            "医疗协作": "Medical Partner",
+            "个人中心": "Profile",
+            "后台首页": "Dashboard",
+            "线索核实": "Clue Review",
+            "猫咪档案": "Cat Records",
+            "医疗工作台": "Medical Desk",
+            "申请审核": "Application Review",
+            "协议交接": "Agreement Handover",
+            "回访任务": "Follow-up Tasks",
+            "异常预警": "Warnings",
+            "用户角色": "Users & Roles",
+            "公告管理": "Notice Management",
+            "操作日志": "Operation Logs",
+            "筛选": "Filter",
+            "详情": "Details",
+            "删除": "Delete",
+            "处理": "Handle",
+            "查看": "View",
+            "编辑": "Edit",
+            "新增": "Create",
+            "导出 CSV": "Export CSV",
+            "操作人": "Operator",
+            "操作类型": "Operation Type",
+            "业务类型": "Business Type",
+            "关键词": "Keyword",
+            "时间": "Time",
+            "操作": "Operation",
+            "业务": "Business",
+            "对象": "Target",
+            "状态": "Status",
+            "变更前": "Before",
+            "变更后": "After",
+            "备注": "Remark",
+            "提交回访记录": "Submit Follow-up Record",
+            "工作人员填写回访记录": "Staff Follow-up Record",
+            "认养人提交回访记录": "Adopter Follow-up Record",
+            "自动生成认养协议": "Auto-generate Adoption Agreement",
+            "删除异常预警": "Delete Warning",
+            "异常预警": "Warning",
+            "回访任务": "Follow-up Task",
+            "认养协议": "Adoption Agreement",
+            "公告": "Notice",
+            "用户": "User",
+            "猫咪": "Cat",
+            "线索": "Clue",
+            "医疗记录": "Medical Record",
+            "认养申请": "Adoption Application",
+            "已完成": "Completed",
+            "待处理": "Pending",
+            "处理中": "Processing",
+            "已处理": "Handled",
+            "已忽略": "Ignored",
+            "已删除": "Deleted",
+            "已生成": "Generated",
+            "已发布": "Published",
+            "已下架": "Offline",
+            "草稿": "Draft",
+            "暂无日志": "No logs",
+            "正在加载操作日志...": "Loading operation logs...",
+            "全局搜索猫咪、线索、申请、协议、预警": "Search cats, clues, applications, agreements, warnings"
+        },
+        ja: {
+            "后台管理系统": "管理システム",
+            "校园流浪猫认养门户": "キャンパス猫譲渡ポータル",
+            "返回前台": "ポータルへ",
+            "退出": "ログアウト",
+            "登录": "ログイン",
+            "注册": "登録",
+            "后台": "管理",
+            "操作日志": "操作ログ",
+            "异常预警": "異常アラート",
+            "回访任务": "フォローアップ",
+            "协议交接": "契約引き渡し",
+            "公告管理": "お知らせ管理",
+            "用户角色": "ユーザー権限",
+            "筛选": "絞り込み",
+            "详情": "詳細",
+            "删除": "削除",
+            "处理": "処理",
+            "操作人": "操作者",
+            "操作类型": "操作種別",
+            "业务类型": "業務種別",
+            "关键词": "キーワード",
+            "时间": "時間",
+            "操作": "操作",
+            "业务": "業務",
+            "对象": "対象",
+            "状态": "状態",
+            "变更前": "変更前",
+            "变更后": "変更後",
+            "备注": "備考",
+            "提交回访记录": "フォロー記録を提出",
+            "已完成": "完了",
+            "已删除": "削除済み",
+            "已生成": "生成済み",
+            "暂无日志": "ログなし",
+            "正在加载操作日志...": "操作ログを読み込み中..."
+        },
+        ko: {
+            "后台管理系统": "관리 시스템",
+            "校园流浪猫认养门户": "캠퍼스 길고양이 입양 포털",
+            "返回前台": "포털로",
+            "退出": "로그아웃",
+            "登录": "로그인",
+            "注册": "가입",
+            "后台": "관리",
+            "操作日志": "작업 로그",
+            "异常预警": "이상 경고",
+            "回访任务": "후속 방문",
+            "协议交接": "계약 인계",
+            "公告管理": "공지 관리",
+            "用户角色": "사용자 역할",
+            "筛选": "필터",
+            "详情": "상세",
+            "删除": "삭제",
+            "处理": "처리",
+            "操作人": "작업자",
+            "操作类型": "작업 유형",
+            "业务类型": "업무 유형",
+            "关键词": "키워드",
+            "时间": "시간",
+            "操作": "작업",
+            "业务": "업무",
+            "对象": "대상",
+            "状态": "상태",
+            "变更前": "변경 전",
+            "变更后": "변경 후",
+            "备注": "비고",
+            "提交回访记录": "후속 기록 제출",
+            "已完成": "완료",
+            "已删除": "삭제됨",
+            "已生成": "생성됨",
+            "暂无日志": "로그 없음",
+            "正在加载操作日志...": "작업 로그 로딩 중..."
+        }
+    };
+
+    const i18nCommonPacks = {
+        en: {
+            "后台管理系统": "Admin System",
+            "校园流浪猫认养门户": "Campus Stray Cat Adoption Portal",
+            "返回前台": "Front Portal",
+            "退出": "Log out",
+            "登录": "Log in",
+            "注册": "Register",
+            "后台": "Admin",
+            "门户首页": "Portal",
+            "数据大屏": "Data Screen",
+            "可认养猫咪": "Adoptable Cats",
+            "公告": "Notices",
+            "上报线索": "Submit Clue",
+            "我的线索": "My Clues",
+            "我的申请": "My Applications",
+            "我的回访": "My Follow-ups",
+            "我的消息": "Messages",
+            "医疗协作": "Medical Partner",
+            "个人中心": "Profile",
+            "后台首页": "Dashboard",
+            "线索核实": "Clue Review",
+            "猫咪档案": "Cat Records",
+            "医疗工作台": "Medical Desk",
+            "申请审核": "Application Review",
+            "协议交接": "Agreement Handover",
+            "回访任务": "Follow-up Tasks",
+            "异常预警": "Warnings",
+            "用户角色": "Users & Roles",
+            "公告管理": "Notice Management",
+            "操作日志": "Operation Logs",
+            "筛选": "Filter",
+            "详情": "Details",
+            "删除": "Delete",
+            "处理": "Handle",
+            "查看": "View",
+            "编辑": "Edit",
+            "新增": "Create",
+            "保存": "Save",
+            "取消": "Cancel",
+            "提交": "Submit",
+            "导出 CSV": "Export CSV",
+            "操作人": "Operator",
+            "操作类型": "Operation Type",
+            "业务类型": "Business Type",
+            "全部状态": "All Statuses",
+            "全部类型": "All Types",
+            "全部等级": "All Levels",
+            "关键词": "Keyword",
+            "时间": "Time",
+            "操作": "Operation",
+            "业务": "Business",
+            "对象": "Target",
+            "状态": "Status",
+            "变更前": "Before",
+            "变更后": "After",
+            "备注": "Remark",
+            "搜索": "Search",
+            "搜索标题、猫咪、认养人": "Search title, cat, adopter",
+            "搜索申请、协议、猫咪、认养人": "Search application, agreement, cat, adopter",
+            "搜索编号、昵称、地点": "Search ID, name, location",
+            "搜索申请人、协议、猫咪、认养人": "Search applicant, agreement, cat, adopter",
+            "正在加载操作日志...": "Loading operation logs...",
+            "暂无日志": "No logs",
+            "暂无数据": "No data",
+            "已完成": "Completed",
+            "待处理": "Pending",
+            "处理中": "Processing",
+            "已处理": "Handled",
+            "已忽略": "Ignored",
+            "已删除": "Deleted",
+            "已生成": "Generated",
+            "已发布": "Published",
+            "已下架": "Offline",
+            "已取消": "Cancelled",
+            "已作废": "Voided",
+            "待交接": "Pending Handover",
+            "已交接": "Handed Over",
+            "草稿": "Draft",
+            "自动生成认养协议": "Auto-generate Adoption Agreement",
+            "生成认养协议": "Generate Adoption Agreement",
+            "编辑认养协议": "Edit Adoption Agreement",
+            "删除异常预警": "Delete Warning",
+            "处理异常预警": "Handle Warning",
+            "更新公告": "Update Notice",
+            "删除公告": "Delete Notice",
+            "新增公告": "Create Notice",
+            "发布公告": "Publish Notice",
+            "下架公告": "Offline Notice",
+            "认养协议": "Adoption Agreement",
+            "回访任务": "Follow-up Task",
+            "异常预警": "Warning",
+            "用户": "User",
+            "猫咪": "Cat",
+            "线索": "Clue",
+            "医疗记录": "Medical Record",
+            "认养申请": "Adoption Application",
+            "回访异常": "Abnormal Follow-up",
+            "回访逾期": "Overdue Follow-up",
+            "健康异常": "Health Abnormality",
+            "高风险申请预警": "High-risk Application Warning",
+            "普通用户": "User",
+            "志愿者": "Volunteer",
+            "管理员": "Admin",
+            "合作医院": "Partner Hospital",
+            "医院工作台": "Hospital Desk",
+            "管理后台": "Admin Panel"
+        },
+        ja: {
+            "后台管理系统": "管理システム",
+            "校园流浪猫认养门户": "キャンパス猫譲渡ポータル",
+            "返回前台": "ポータルへ戻る",
+            "退出": "ログアウト",
+            "登录": "ログイン",
+            "注册": "登録",
+            "后台": "管理",
+            "门户首页": "ポータル",
+            "数据大屏": "データ画面",
+            "可认养猫咪": "譲渡可能な猫",
+            "公告": "お知らせ",
+            "上报线索": "情報を送信",
+            "我的线索": "自分の情報",
+            "我的申请": "自分の申請",
+            "我的回访": "自分のフォロー",
+            "我的消息": "メッセージ",
+            "医疗协作": "医療連携",
+            "个人中心": "プロフィール",
+            "后台首页": "ダッシュボード",
+            "线索核实": "情報確認",
+            "猫咪档案": "猫台帳",
+            "医疗工作台": "医療デスク",
+            "申请审核": "申請審査",
+            "协议交接": "契約引渡し",
+            "回访任务": "フォロータスク",
+            "异常预警": "異常アラート",
+            "用户角色": "ユーザーと権限",
+            "公告管理": "お知らせ管理",
+            "操作日志": "操作ログ",
+            "筛选": "絞り込み",
+            "详情": "詳細",
+            "删除": "削除",
+            "处理": "処理",
+            "查看": "表示",
+            "编辑": "編集",
+            "新增": "作成",
+            "保存": "保存",
+            "取消": "取消",
+            "提交": "送信",
+            "导出 CSV": "CSV出力",
+            "操作人": "操作ユーザー",
+            "操作类型": "操作種別",
+            "业务类型": "業務種別",
+            "全部状态": "すべての状態",
+            "关键词": "キーワード",
+            "时间": "時間",
+            "操作": "操作",
+            "业务": "業務",
+            "对象": "対象",
+            "状态": "状態",
+            "变更前": "変更前",
+            "变更后": "変更後",
+            "备注": "備考",
+            "已完成": "完了",
+            "待处理": "未処理",
+            "处理中": "処理中",
+            "已处理": "処理済み",
+            "已忽略": "無視済み",
+            "已删除": "削除済み",
+            "已生成": "生成済み",
+            "已发布": "公開済み",
+            "已下架": "非公開",
+            "已取消": "取消済み",
+            "已作废": "無効",
+            "待交接": "引渡し待ち",
+            "已交接": "引渡し済み",
+            "草稿": "下書き",
+            "认养协议": "譲渡契約",
+            "回访任务": "フォロータスク",
+            "异常预警": "異常アラート",
+            "用户": "ユーザー",
+            "猫咪": "猫",
+            "线索": "情報",
+            "医疗记录": "医療記録",
+            "认养申请": "譲渡申請"
+        },
+        ko: {
+            "后台管理系统": "관리 시스템",
+            "校园流浪猫认养门户": "캠퍼스 고양이 입양 포털",
+            "返回前台": "포털로 돌아가기",
+            "退出": "로그아웃",
+            "登录": "로그인",
+            "注册": "가입",
+            "后台": "관리",
+            "门户首页": "포털",
+            "数据大屏": "데이터 화면",
+            "可认养猫咪": "입양 가능한 고양이",
+            "公告": "공지",
+            "上报线索": "제보 등록",
+            "我的线索": "내 제보",
+            "我的申请": "내 신청",
+            "我的回访": "내 사후관리",
+            "我的消息": "메시지",
+            "医疗协作": "의료 협업",
+            "个人中心": "프로필",
+            "后台首页": "대시보드",
+            "线索核实": "제보 확인",
+            "猫咪档案": "고양이 기록",
+            "医疗工作台": "의료 데스크",
+            "申请审核": "신청 심사",
+            "协议交接": "계약 인계",
+            "回访任务": "사후관리 작업",
+            "异常预警": "이상 경고",
+            "用户角色": "사용자 및 권한",
+            "公告管理": "공지 관리",
+            "操作日志": "작업 로그",
+            "筛选": "필터",
+            "详情": "상세",
+            "删除": "삭제",
+            "处理": "처리",
+            "查看": "보기",
+            "编辑": "편집",
+            "新增": "생성",
+            "保存": "저장",
+            "取消": "취소",
+            "提交": "제출",
+            "导出 CSV": "CSV 내보내기",
+            "操作人": "작업자",
+            "操作类型": "작업 유형",
+            "业务类型": "업무 유형",
+            "全部状态": "전체 상태",
+            "关键词": "키워드",
+            "时间": "시간",
+            "操作": "작업",
+            "业务": "업무",
+            "对象": "대상",
+            "状态": "상태",
+            "变更前": "변경 전",
+            "变更后": "변경 후",
+            "备注": "비고",
+            "已完成": "완료",
+            "待处理": "대기",
+            "处理中": "처리 중",
+            "已处理": "처리됨",
+            "已忽略": "무시됨",
+            "已删除": "삭제됨",
+            "已生成": "생성됨",
+            "已发布": "게시됨",
+            "已下架": "비공개",
+            "已取消": "취소됨",
+            "已作废": "무효",
+            "待交接": "인계 대기",
+            "已交接": "인계 완료",
+            "草稿": "초안",
+            "认养协议": "입양 계약",
+            "回访任务": "사후관리 작업",
+            "异常预警": "이상 경고",
+            "用户": "사용자",
+            "猫咪": "고양이",
+            "线索": "제보",
+            "医疗记录": "의료 기록",
+            "认养申请": "입양 신청"
+        }
+    };
+
+    const i18nFallbackPacks = {
+        en: {
+            "合肥工业大学校园流浪猫在线认养系统": "HFUT Campus Stray Cat Online Adoption System",
+            "校园公益认养与流浪猫全生命周期管理平台": "Campus public-welfare adoption and stray cat lifecycle management platform",
+            "从发现线索到安心到家": "From discovery clue to safe arrival home",
+            "从发现线索到长期回访": "From discovery clue to long-term follow-up",
+            "登录后默认进入前台门户": "After login, you enter the front portal by default",
+            "医院用户和管理员可从前台入口进入对应后台": "Hospital users and admins can enter their workbench from the front portal",
+            "请在提交申请或处理业务前先查看最新公告": "Please read the latest notices before submitting applications or handling tasks",
+            "查看本人提交线索的核实和建档进度": "View verification and filing progress for your submitted clues",
+            "查看待回访任务并提交回访反馈": "View pending follow-up tasks and submit feedback",
+            "提交居住环境和照护经验": "Submit housing environment and care experience",
+            "协议生成与线下交接登记": "Agreement generation and offline handover registration",
+            "异常或逾期自动进入预警": "Abnormal or overdue items automatically become warnings",
+            "正在加载门户数据...": "Loading portal data...",
+            "正在加载可认养猫咪...": "Loading adoptable cats...",
+            "正在加载猫咪详情...": "Loading cat details...",
+            "正在加载申请表...": "Loading application form...",
+            "正在加载我的申请...": "Loading my applications...",
+            "正在加载我的线索...": "Loading my clues...",
+            "正在加载我的回访任务...": "Loading my follow-up tasks...",
+            "正在加载回访任务详情...": "Loading follow-up task details...",
+            "正在加载站内消息...": "Loading messages...",
+            "正在加载个人中心...": "Loading profile...",
+            "正在加载后台首页...": "Loading dashboard...",
+            "正在加载猫咪档案...": "Loading cat records...",
+            "正在加载医疗工作台...": "Loading medical desk...",
+            "正在加载认养申请...": "Loading adoption applications...",
+            "正在加载协议交接记录...": "Loading agreement handover records...",
+            "正在加载回访任务...": "Loading follow-up tasks...",
+            "正在加载异常预警...": "Loading warnings...",
+            "正在加载用户...": "Loading users...",
+            "正在加载公告...": "Loading notices...",
+            "正在加载公告详情...": "Loading notice details...",
+            "正在加载公告发布台...": "Loading notice editor...",
+            "正在加载实时数据大屏...": "Loading real-time data screen...",
+            "正在校验登录状态...": "Checking login status...",
+            "当前账号无权执行此操作": "The current account is not allowed to perform this operation",
+            "当前不能进入该页面": "You cannot enter this page now",
+            "请先登录后再访问需要权限的后台页面": "Please log in before visiting protected admin pages",
+            "当前猫咪不是可认养状态": "This cat is not currently adoptable",
+            "确认删除该异常预警": "Confirm deleting this warning?",
+            "删除后列表不再显示": "It will no longer appear in the list after deletion",
+            "确认删除该公告？": "Confirm deleting this notice?",
+            "确认作废该未交接协议": "Confirm voiding this unhanded agreement?",
+            "确认删除该未交接协议": "Confirm deleting this unhanded agreement?",
+            "确认作废该医疗记录": "Confirm voiding this medical record?",
+            "确认作废该认养申请": "Confirm voiding this adoption application?",
+            "确认逻辑删除该线索": "Confirm logically deleting this clue?",
+            "确认归档该猫咪档案": "Confirm archiving this cat record?",
+            "请先选择一张图片": "Please select an image first",
+            "图片不能超过 5MB": "Image must not exceed 5 MB",
+            "照片不能超过 5MB": "Photo must not exceed 5 MB",
+            "请先点击上传附件图片": "Please upload the attachment image first",
+            "请先点击上传回访照片": "Please upload the follow-up photo first",
+            "上传完成后再保存记录": "Save the record after upload is complete",
+            "上传完成后再保存医疗记录": "Save the medical record after upload is complete",
+            "图片还没有上传成功，请先上传完成后再保存公告": "The image has not uploaded successfully; finish upload before saving the notice",
+            "正在上传": "Uploading",
+            "图片已上传，保存公告后生效": "Image uploaded; it takes effect after saving the notice",
+            "已移除图片，保存公告后生效": "Image removed; it takes effect after saving the notice",
+            "公告已保存": "Notice saved",
+            "公告已发布": "Notice published",
+            "公告已下架": "Notice offlined",
+            "公告已删除": "Notice deleted",
+            "正在保存...": "Saving...",
+            "正在发布...": "Publishing...",
+            "正在下架...": "Offlining...",
+            "正在删除...": "Deleting...",
+            "发布范围至少选择一个角色": "Select at least one target role",
+            "请至少选择一个发布范围": "Please select at least one publishing scope",
+            "公告会同步显示到前台公告页": "The notice will also appear on the front notice page",
+            "发布新公告": "Publish New Notice",
+            "编辑公告": "Edit Notice",
+            "保存公告": "Save Notice",
+            "新增公告": "Create Notice",
+            "取消编辑": "Cancel Editing",
+            "公告列表": "Notice List",
+            "公告图片": "Notice Image",
+            "公告图片预览": "Notice image preview",
+            "暂无公告图片": "No notice image",
+            "上传/更换图片": "Upload/Replace Image",
+            "移除图片": "Remove Image",
+            "公告内容": "Notice Content",
+            "填写公告正文，建议包含时间、地点、对象和注意事项": "Write notice content, preferably including time, place, audience, and notes",
+            "例如：本周认养开放日安排": "Example: This week's adoption open day schedule",
+            "系统公告": "System Notice",
+            "认养公告": "Adoption Notice",
+            "回访提醒": "Follow-up Reminder",
+            "全部角色": "All Roles",
+            "普通用户": "Regular User",
+            "志愿者": "Volunteer",
+            "合作医院": "Partner Hospital",
+            "管理员": "Admin",
+            "校园流浪猫实时数据驾驶舱": "Campus Stray Cat Real-time Data Cockpit",
+            "猫咪状态矩阵": "Cat Status Matrix",
+            "申请状态监控": "Application Status Monitor",
+            "认养智能体": "Adoption Assistant",
+            "你好，我是认养智能体。可以问我认养前准备、申请怎么写、猫咪到家适应期、回访照片要求等问题。": "Hello, I am the adoption assistant. You can ask about preparation, applications, adaptation after bringing a cat home, and follow-up photo requirements.",
+            "输入你的认养问题...": "Enter your adoption question...",
+            "想问什么都可以，直接输入你的问题...": "Ask anything; type your question directly...",
+            "发送": "Send",
+            "查看可认养": "View Adoptable Cats",
+            "同步公告": "Synced Notices",
+            "常见问题": "FAQ",
+            "点击卡片，快速了解认养常见问题": "Click a card to quickly learn common adoption questions",
+            "认养准备": "Adoption Preparation",
+            "申请建议": "Application Advice",
+            "适应期": "Adaptation Period",
+            "回访要求": "Follow-up Requirements",
+            "新手避坑": "Beginner Tips",
+            "喂养护理": "Feeding and Care",
+            "用品清单、预算评估、居家环境准备": "Supply list, budget estimate, and home preparation",
+            "申请填写、自我介绍、提升通过率": "Application writing, self-introduction, and approval tips",
+            "到家应激、隔离观察、作息适应": "Stress after arrival, isolation observation, and routine adaptation",
+            "回访频率、拍照要求、注意事项": "Follow-up frequency, photo requirements, and notes",
+            "常见误区、认养禁忌、错误做法提醒": "Common mistakes, adoption taboos, and incorrect practices",
+            "饮食、猫砂、清洁、健康管理": "Diet, litter, cleaning, and health management",
+            "点击查看答案": "Click to view answer",
+            "点击翻回": "Click to flip back",
+            "你是谁": "Who are you?",
+            "你会做什么": "What can you do?",
+            "正在思考...": "Thinking...",
+            "智能体暂时不可用，请稍后再试。": "The assistant is temporarily unavailable. Please try again later.",
+            "暂时没有生成有效回答。": "No valid answer was generated for now.",
+            "我暂时没有生成有效回答。": "I could not generate a valid answer for now.",
+            "认养前需要准备什么？": "What should I prepare before adoption?",
+            "申请认养时怎么写更合适？": "How should I write an adoption application?",
+            "猫咪到家后躲起来怎么办？": "What if the cat hides after arriving home?",
+            "回访照片要怎么拍？": "How should I take follow-up photos?",
+            "新手认养有哪些常见误区？": "What common mistakes do beginners make?",
+            "猫咪日常喂养护理要注意什么？": "What should I know about daily feeding and care?",
+            "预算大概要准备多少？": "How much budget should I prepare?",
+            "提前准备猫粮、猫砂盆、猫砂、食碗水碗、猫包和安全封窗，并确认室友或家人同意。": "Prepare cat food, litter box, litter, food and water bowls, carrier, and secure windows; confirm roommates or family agree.",
+            "写清住所稳定性、经济能力、养宠经验、假期照护安排，以及愿意配合回访的承诺。": "Clearly describe housing stability, financial ability, pet experience, holiday care plans, and commitment to follow-ups.",
+            "先给猫咪安静小空间，不强抱不追赶，保持食水和猫砂固定，通常观察 3 到 7 天。": "Give the cat a quiet small space first, do not force holding or chasing, keep food/water and litter fixed, and observe for 3 to 7 days.",
+            "照片建议包含猫咪近照、生活环境、食水区和猫砂区，画面清晰无遮挡，按节点提交。": "Photos should include recent cat photos, living environment, food/water area, and litter area; submit clear, unobstructed photos on schedule.",
+            "不要冲动认养、不要频繁换粮、不要放养，也不要忽视封窗、驱虫和绝育计划。": "Do not adopt impulsively, switch food frequently, let cats roam outside, or ignore window safety, deworming, and sterilization plans.",
+            "保持饮食稳定、每日清理猫砂、定期驱虫免疫，发现拒食呕吐腹泻要及时咨询医生。": "Keep diet stable, clean litter daily, deworm and vaccinate regularly, and consult a doctor if refusal to eat, vomiting, or diarrhea occurs.",
+            "认养前": "Before Adoption",
+            "申请表": "Application Form",
+            "猫咪到家": "Cat Arrives Home",
+            "回访照片": "Follow-up Photos",
+            "新手": "Beginner",
+            "预算": "Budget",
+            "首页": "Home",
+            "开放日": "Open Day",
+            "咨询": "Consultation",
+            "资料维护": "Profile Maintenance",
+            "消息通知": "Message Notifications",
+            "身份核验": "Identity Verification",
+            "状态查询": "Status Query",
+            "长期回访": "Long-term Follow-up",
+            "医疗异常": "Medical Abnormality",
+            "高风险申请": "High-risk Application",
+            "待核实": "Pending Verification",
+            "已核实有效": "Verified Valid",
+            "已建档": "Filed",
+            "无效": "Invalid",
+            "观察中": "Under Observation",
+            "医疗中": "Under Treatment",
+            "可认养": "Adoptable",
+            "申请中": "Applying",
+            "已认养": "Adopted",
+            "回访中": "In Follow-up",
+            "待初审": "Pending Initial Review",
+            "待终审": "Pending Final Review",
+            "初审拒绝": "Initial Review Rejected",
+            "终审拒绝": "Final Review Rejected",
+            "已通过": "Approved",
+            "已拒绝": "Rejected",
+            "已撤回": "Withdrawn",
+            "低风险": "Low Risk",
+            "中风险": "Medium Risk",
+            "高风险": "High Risk",
+            "健康": "Healthy",
+            "需观察": "Needs Observation",
+            "需治疗": "Needs Treatment",
+            "逾期": "Overdue",
+            "异常": "Abnormal",
+            "今天": "Today",
+            "待办": "Tasks",
+            "优先待办": "Priority Tasks",
+            "业务分布": "Business Distribution",
+            "按风险和流程阻塞排序": "Sorted by risk and process blocking",
+            "按状态聚合的后台指标": "Admin metrics grouped by status",
+            "申请": "Application",
+            "协议": "Agreement",
+            "预警": "Warning",
+            "线索": "Clue",
+            "医疗": "Medical",
+            "回访": "Follow-up",
+            "认养": "Adoption",
+            "详情": "Details",
+            "记录": "Record",
+            "列表": "List",
+            "搜索": "Search",
+            "筛选": "Filter",
+            "全部": "All",
+            "暂无": "None",
+            "正在加载": "Loading",
+            "确认": "Confirm",
+            "请输入": "Please enter",
+            "请选择": "Please select",
+            "不能": "cannot",
+            "没有": "no",
+            "成功": "success",
+            "失败": "failed",
+            "保存": "Save",
+            "上传": "Upload",
+            "删除": "Delete",
+            "作废": "Void",
+            "发布": "Publish",
+            "下架": "Offline",
+            "编辑": "Edit",
+            "新增": "Create",
+            "提交": "Submit",
+            "返回": "Back",
+            "进入": "Enter",
+            "查看": "View",
+            "处理": "Handle",
+            "关闭": "Close",
+            "图片": "Image",
+            "照片": "Photo",
+            "附件": "Attachment",
+            "内容": "Content",
+            "原因": "Reason",
+            "意见": "Comment",
+            "说明": "Description",
+            "时间": "Time",
+            "地点": "Location",
+            "状态": "Status",
+            "类型": "Type",
+            "等级": "Level",
+            "标题": "Title",
+            "编号": "ID",
+            "姓名": "Name",
+            "电话": "Phone",
+            "账号": "Account",
+            "密码": "Password",
+            "角色": "Role",
+            "范围": "Scope",
+            "排序": "Sort",
+            "数量": "Count",
+            "条": " items",
+            "个": " ",
+            "天": " days"
+        },
+        ja: {
+            "正在加载": "読み込み中",
+            "确认": "確認",
+            "请输入": "入力してください",
+            "请选择": "選択してください",
+            "暂无": "なし",
+            "全部": "すべて",
+            "保存": "保存",
+            "上传": "アップロード",
+            "删除": "削除",
+            "作废": "無効化",
+            "发布": "公開",
+            "下架": "非公開",
+            "编辑": "編集",
+            "新增": "作成",
+            "提交": "送信",
+            "返回": "戻る",
+            "进入": "入る",
+            "查看": "表示",
+            "处理": "処理",
+            "关闭": "閉じる",
+            "图片": "画像",
+            "照片": "写真",
+            "附件": "添付",
+            "内容": "内容",
+            "原因": "理由",
+            "意见": "コメント",
+            "说明": "説明",
+            "时间": "時間",
+            "地点": "場所",
+            "状态": "状態",
+            "类型": "種類",
+            "等级": "レベル",
+            "标题": "タイトル",
+            "编号": "ID",
+            "姓名": "氏名",
+            "电话": "電話",
+            "账号": "アカウント",
+            "密码": "パスワード",
+            "角色": "権限",
+            "申请": "申請",
+            "协议": "契約",
+            "预警": "アラート",
+            "线索": "情報",
+            "医疗": "医療",
+            "回访": "フォロー",
+            "认养": "譲渡",
+            "详情": "詳細",
+            "记录": "記録",
+            "列表": "一覧",
+            "搜索": "検索",
+            "筛选": "絞り込み",
+            "猫咪": "猫",
+            "公告": "お知らせ",
+            "用户": "ユーザー",
+            "志愿者": "ボランティア",
+            "管理员": "管理者",
+            "合作医院": "協力病院",
+            "普通用户": "一般ユーザー",
+            "已完成": "完了",
+            "待处理": "未処理",
+            "处理中": "処理中",
+            "已处理": "処理済み",
+            "已删除": "削除済み",
+            "已生成": "生成済み",
+            "已发布": "公開済み",
+            "已下架": "非公開",
+            "草稿": "下書き",
+            "条": "件",
+            "个": "件",
+            "天": "日"
+        },
+        ko: {
+            "正在加载": "로딩 중",
+            "确认": "확인",
+            "请输入": "입력하세요",
+            "请选择": "선택하세요",
+            "暂无": "없음",
+            "全部": "전체",
+            "保存": "저장",
+            "上传": "업로드",
+            "删除": "삭제",
+            "作废": "무효",
+            "发布": "게시",
+            "下架": "비공개",
+            "编辑": "편집",
+            "新增": "생성",
+            "提交": "제출",
+            "返回": "돌아가기",
+            "进入": "들어가기",
+            "查看": "보기",
+            "处理": "처리",
+            "关闭": "닫기",
+            "图片": "이미지",
+            "照片": "사진",
+            "附件": "첨부",
+            "内容": "내용",
+            "原因": "사유",
+            "意见": "의견",
+            "说明": "설명",
+            "时间": "시간",
+            "地点": "장소",
+            "状态": "상태",
+            "类型": "유형",
+            "等级": "등급",
+            "标题": "제목",
+            "编号": "번호",
+            "姓名": "이름",
+            "电话": "전화",
+            "账号": "계정",
+            "密码": "비밀번호",
+            "角色": "역할",
+            "申请": "신청",
+            "协议": "계약",
+            "预警": "경고",
+            "线索": "제보",
+            "医疗": "의료",
+            "回访": "사후관리",
+            "认养": "입양",
+            "详情": "상세",
+            "记录": "기록",
+            "列表": "목록",
+            "搜索": "검색",
+            "筛选": "필터",
+            "猫咪": "고양이",
+            "公告": "공지",
+            "用户": "사용자",
+            "志愿者": "봉사자",
+            "管理员": "관리자",
+            "合作医院": "협력 병원",
+            "普通用户": "일반 사용자",
+            "已完成": "완료",
+            "待处理": "대기",
+            "处理中": "처리 중",
+            "已处理": "처리됨",
+            "已删除": "삭제됨",
+            "已生成": "생성됨",
+            "已发布": "게시됨",
+            "已下架": "비공개",
+            "草稿": "초안",
+            "条": "건",
+            "个": "개",
+            "天": "일"
+        }
+    };
 
     const roleLabels = {
         STUDENT: "普通用户",
@@ -117,10 +942,7 @@
         { path: "#/my/applications", label: "我的申请", title: "我的申请", text: "查看认养申请状态、审核意见和协议交接信息。" },
         { path: "#/my/followups", label: "我的回访", title: "我的回访", text: "查看待回访任务并提交回访反馈。" },
         { path: "#/my/messages", label: "我的消息", title: "我的消息", text: "查看系统通知、审核结果、协议和回访提醒。" },
-        { path: "#/volunteer/clues", label: "线索审核", roles: ["VOLUNTEER"], title: "线索审核", text: "志愿者核实普通用户提交的猫咪线索，确认有效、无效或生成猫咪档案。" },
-        { path: "#/volunteer/followups", label: "回访任务", roles: ["VOLUNTEER"], title: "回访任务", text: "志愿者查看全部回访任务，填写回访记录并跟进异常情况。" },
-        { path: "#/admin-notices", label: "公告发布", roles: ["ADMIN"], title: "公告发布", text: "管理员在前台编辑公告、发布或下架公告。" },
-        { path: "#/hospital", label: "医疗协作", roles: ["HOSPITAL"], title: "医疗协作门户", text: "合作医院查看待医疗猫咪、最近医疗记录和后台入口。" },
+        { path: "#/hospital", label: "医疗协作", roles: ["HOSPITAL"], title: "医疗协作门户", text: "合作医院查看待医疗猫咪、最近医疗记录和工作台入口。" },
         { path: "#/profile", label: "个人中心", title: "个人中心", text: "维护个人资料，查看申请、回访、消息和对应后台入口。" },
         { path: "#/login", label: "登录", title: "登录", text: "使用统一账号进入前台或后台。" },
         { path: "#/register", label: "注册", title: "注册", text: "创建普通用户账号，提交线索和认养申请。" }
@@ -128,18 +950,17 @@
 
     const adminRoutes = [
         { path: "#/admin/dashboard", label: "Dashboard", roles: ["VOLUNTEER", "ADMIN"], title: "后台首页", text: "展示猫咪、线索、申请、回访、预警等 MIS 指标。" },
-        { path: "#/admin/hospital", label: "医院首页", roles: ["HOSPITAL", "ADMIN"], title: "医院协作后台", text: "合作医院查看待处理猫咪、本院医疗记录和健康异常。" },
         { path: "#/admin/clues", label: "线索核实", roles: ["VOLUNTEER", "ADMIN"], title: "线索核实管理", text: "志愿者核实线索，管理员查看和追踪处理结果。" },
         { path: "#/admin/cats", label: "猫咪档案", roles: ["VOLUNTEER", "ADMIN"], title: "猫咪档案管理", text: "维护猫咪档案、照片、标签和生命周期状态。" },
         { path: "#/admin/medical", label: "医疗工作台", roles: ["HOSPITAL", "ADMIN"], title: "医疗记录管理", text: "医院用户录入体检、疫苗、绝育、治疗和异常记录。" },
         { path: "#/admin/adoption/audits", label: "申请审核", roles: ["VOLUNTEER", "ADMIN"], title: "认养申请审核", text: "志愿者初审，管理员终审，沉淀审核记录。" },
-        { path: "#/admin/agreements", label: "协议交接", roles: ["VOLUNTEER", "ADMIN"], title: "协议交接管理", text: "管理员生成协议、登记交接并触发回访任务。" },
+        { path: "#/admin/agreements", label: "协议交接", roles: ["VOLUNTEER", "ADMIN"], title: "协议交接管理", text: "系统自动生成协议，管理员查看、编辑、作废、删除协议并登记交接。" },
         { path: "#/admin/followups", label: "回访任务", roles: ["VOLUNTEER", "ADMIN"], title: "回访任务管理", text: "查看待回访、已完成、逾期和异常回访任务。" },
         { path: "#/admin/warnings", label: "异常预警", roles: ["VOLUNTEER", "ADMIN"], title: "异常预警中心", text: "处理回访逾期、回访异常、医疗异常和高风险申请。" },
         { path: "#/admin/users", label: "用户角色", roles: ["ADMIN"], title: "用户与角色管理", text: "管理员启停用户、分配角色并记录操作日志。" },
         { path: "#/admin/notices", label: "公告管理", roles: ["ADMIN"], title: "公告管理", text: "维护草稿、已发布、已下架公告。" },
-        { path: "#/admin/logs", label: "操作日志", roles: ["ADMIN"], title: "操作日志", text: "查看审核、状态变更、交接、预警处理等关键日志。" },
-        { path: "#/admin/dicts", label: "字典管理", roles: ["ADMIN"], title: "字典管理", text: "维护猫咪状态、审核状态、紧急程度、预警类型等字典。" }
+        { path: "#/admin/logs", label: "操作日志", roles: ["ADMIN"], title: "操作日志", text: "查看审核、状态变更、交接、预警处理等关键日志。" }
+       
     ];
 
     const privateFrontRoutePaths = new Set([
@@ -178,8 +999,95 @@
     }
 
     function currentUser() {
+        // 从本地登录态中恢复当前用户，并统一角色编码，后续路由权限判断都依赖这个对象。
         if (!authState || !authState.token || !authState.user) return null;
         return { ...authState.user, role: normalizeRole(authState.user.role) };
+    }
+
+    function translateText(value) {
+        if (!value) return value;
+        if (currentLocale === "zh") return String(value);
+        const pack = { ...(i18nPacks[currentLocale] || {}), ...(i18nCommonPacks[currentLocale] || {}) };
+        let result = String(value);
+        const keep = [];
+        result = result.replace(/\b(?:APP|AGR|CAT|NT|CL|LG|MR|U|A)\d{4,}\b/g, match => {
+            keep.push(match);
+            return `__I18N_KEEP_${keep.length - 1}__`;
+        });
+        Object.keys(pack).sort((a, b) => b.length - a.length).forEach(key => {
+            result = result.replaceAll(key, pack[key]);
+        });
+        keep.forEach((value, index) => {
+            result = result.replaceAll(`__I18N_KEEP_${index}__`, value);
+        });
+        return result;
+    }
+
+    window.alert = message => nativeAlert(translateText(message));
+    window.confirm = message => nativeConfirm(translateText(message));
+    window.prompt = (message, defaultValue) => nativePrompt(translateText(message), defaultValue);
+
+    function languageSwitcher() {
+        return `<select class="mis-language-switch" id="mis-language-switch" aria-label="语言">
+            ${Object.entries(supportedLocales).map(([key, label]) => `<option value="${key}" ${currentLocale === key ? "selected" : ""}>${label}</option>`).join("")}
+        </select>`;
+    }
+
+    function bindLanguageSwitcher() {
+        document.querySelectorAll("#mis-language-switch").forEach(select => {
+            select.addEventListener("change", event => {
+                currentLocale = event.target.value || "zh";
+                localStorage.setItem(localeStorageKey, currentLocale);
+                render();
+            });
+        });
+    }
+
+    function applyLocale(root = shell) {
+        if (!root) return;
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+            acceptNode(node) {
+                const parent = node.parentElement;
+                if (!parent || ["SCRIPT", "STYLE", "TEXTAREA"].includes(parent.tagName) || parent.closest?.("[data-no-i18n]")) {
+                    return NodeFilter.FILTER_REJECT;
+                }
+                return node.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+            }
+        });
+        const nodes = [];
+        while (walker.nextNode()) nodes.push(walker.currentNode);
+        nodes.forEach(node => {
+            if (node._i18nSource == null) node._i18nSource = node.nodeValue;
+            node.nodeValue = currentLocale === "zh" ? node._i18nSource : translateText(node._i18nSource);
+        });
+        root.querySelectorAll?.("[placeholder], [title], [aria-label], [value]").forEach(el => {
+            ["placeholder", "title", "aria-label"].forEach(attr => {
+                if (!el.hasAttribute(attr)) return;
+                const sourceAttr = `data-i18n-${attr}`;
+                if (!el.hasAttribute(sourceAttr)) el.setAttribute(sourceAttr, el.getAttribute(attr));
+                el.setAttribute(attr, currentLocale === "zh" ? el.getAttribute(sourceAttr) : translateText(el.getAttribute(sourceAttr)));
+            });
+            if (el.tagName === "INPUT" && ["button", "submit", "reset"].includes((el.getAttribute("type") || "").toLowerCase())) {
+                if (!el.hasAttribute("data-i18n-value")) el.setAttribute("data-i18n-value", el.getAttribute("value") || "");
+                el.setAttribute("value", currentLocale === "zh" ? el.getAttribute("data-i18n-value") : translateText(el.getAttribute("data-i18n-value")));
+            }
+        });
+    }
+
+    function startLocaleObserver() {
+        if (localeObserver) localeObserver.disconnect();
+        localeObserver = new MutationObserver(mutations => {
+            mutations.forEach(mutation => {
+                mutation.addedNodes.forEach(node => {
+                    if (node.nodeType === Node.ELEMENT_NODE) applyLocale(node);
+                    if (node.nodeType === Node.TEXT_NODE) {
+                        if (node._i18nSource == null) node._i18nSource = node.nodeValue;
+                        node.nodeValue = currentLocale === "zh" ? node._i18nSource : translateText(node._i18nSource);
+                    }
+                });
+            });
+        });
+        localeObserver.observe(shell, { childList: true, subtree: true });
     }
 
     function token() {
@@ -187,6 +1095,7 @@
     }
 
     function saveAuth(result) {
+        // 登录成功后把 token 和用户信息保存到 localStorage，刷新页面后仍可恢复会话。
         authState = result?.user ? { ...result, user: { ...result.user, role: normalizeRole(result.user.role) } } : result;
         localStorage.setItem("hfut-cat-auth", JSON.stringify(authState));
     }
@@ -322,7 +1231,7 @@
         const role = normalizeRole(user?.role);
         if (!user || role === "STUDENT") return "";
         if (role === "HOSPITAL") {
-            return `<a class="primary-btn compact" href="#/admin/hospital">医院后台</a>`;
+            return `<a class="primary-btn compact" href="#/admin/medical">医院工作台</a>`;
         }
         if (role === "VOLUNTEER") {
             return `<a class="primary-btn compact" href="#/admin/dashboard">志愿者工作台</a>`;
@@ -404,8 +1313,8 @@
                     </div>
                     <div class="role-actions">
                         <a class="primary-btn" href="#/admin/dashboard">进入志愿者工作台</a>
-                        <a class="ghost-btn" href="#/volunteer/clues">线索审核</a>
-                        <a class="ghost-btn" href="#/volunteer/followups">回访任务</a>
+                        <a class="ghost-btn" href="#/admin/clues">线索审核</a>
+                        <a class="ghost-btn" href="#/admin/followups">回访任务</a>
                         <a class="ghost-btn" href="#/admin/adoption/audits">认养初审</a>
                         <a class="ghost-btn" href="#/admin/cats">猫咪档案管理</a>
                         <a class="ghost-btn" href="#/my/messages">我的消息${unread ? `(${unread})` : ""}</a>
@@ -423,7 +1332,6 @@
                     </div>
                     <div class="role-actions">
                         <a class="primary-btn" href="#/hospital">进入医疗协作门户</a>
-                        <a class="ghost-btn" href="#/admin/hospital">医院后台首页</a>
                         <a class="ghost-btn" href="#/admin/medical">待医疗猫咪</a>
                         <a class="ghost-btn" href="#/admin/medical">医疗记录管理</a>
                         <a class="ghost-btn" href="#/admin/medical">健康异常记录</a>
@@ -444,7 +1352,7 @@
                     <a class="ghost-btn" href="#/admin/dashboard">Dashboard</a>
                     <a class="ghost-btn" href="#/admin/warnings">待处理预警</a>
                     <a class="ghost-btn" href="#/admin/users">用户管理</a>
-                    <a class="ghost-btn" href="#/admin-notices">公告发布</a>
+                    <a class="ghost-btn" href="#/admin/notices">公告发布</a>
                     <a class="ghost-btn" href="#/admin/logs">操作日志</a>
                 </div>
             </section>
@@ -452,6 +1360,7 @@
     }
 
     async function api(path, options) {
+        // 统一封装后端接口请求：自动带上登录 Token，并把后端 ApiResponse 转成前端可直接使用的数据。
         const headers = { "Content-Type": "application/json", ...(options && options.headers ? options.headers : {}) };
         const authToken = token();
         if (authToken) {
@@ -464,7 +1373,6 @@
             throw new Error(payload.message || "登录已过期，请重新登录。");
         }
         if (response.status === 403) {
-            window.location.hash = "#/403";
             throw new Error(payload.message || "当前账号无权执行此操作。");
         }
         if (!response.ok || !payload.success) {
@@ -474,6 +1382,7 @@
     }
 
     function validateCleanText(label, value, min, max) {
+        // 前端表单基础校验：过滤空值、过短过长文本和明显测试占位内容，减少无效演示数据进入数据库。
         const text = String(value || "").trim();
         if (!text) return `${label}不能为空`;
         if (text.length < min) return `${label}内容过短`;
@@ -570,7 +1479,7 @@
                 try {
                     payload = JSON.parse(request.responseText || "{}");
                 } catch (error) {
-                    reject(new Error("上传接口返回异常"));
+                    reject(new Error(request.responseText || `上传接口返回异常（HTTP ${request.status}）`));
                     return;
                 }
                 if (request.status === 401) {
@@ -584,7 +1493,7 @@
                     return;
                 }
                 if (request.status < 200 || request.status >= 300 || !payload.success) {
-                    reject(new Error(payload.message || "上传失败"));
+                    reject(new Error(payload.message || `上传失败（HTTP ${request.status}）`));
                     return;
                 }
                 resolve(payload.data);
@@ -593,6 +1502,17 @@
             request.addEventListener("abort", () => reject(new Error("上传已取消")));
             request.send(formData);
         });
+    }
+
+    async function uploadNoticeImageFile(file, onProgress) {
+        try {
+            return await uploadFileWithProgress("/api/uploads/notices", file, onProgress);
+        } catch (error) {
+            if (!String(error.message || "").includes("404")) {
+                throw error;
+            }
+            return uploadFileWithProgress("/api/uploads/clues", file, onProgress);
+        }
     }
 
     function bindAdminGlobalSearch() {
@@ -844,6 +1764,11 @@
     }
 
     function renderForbidden(user) {
+        const role = normalizeRole(user?.role);
+        const homeHref = role === "HOSPITAL" ? "#/hospital" : "#/";
+        const backendHref = roleLanding(user);
+        const currentHash = (window.location.hash || "#/").split("?")[0];
+        const showBackendLink = user && role !== "STUDENT" && backendHref !== currentHash;
         document.body.classList.add("mis-active");
         shell.innerHTML = `
             <main class="mis-forbidden">
@@ -852,12 +1777,26 @@
                     <h1>无权限访问</h1>
                     <p>${user ? `${escapeHtml(roleLabels[normalizeRole(user.role)] || normalizeRole(user.role))} 当前不能进入该页面。` : "请先登录后再访问需要权限的后台页面。"}</p>
                     <div class="mis-actions">
-                        <a class="primary-btn" href="#/">回到前台</a>
-                        <a class="ghost-btn" href="#/login">前往登录</a>
+                        <a class="primary-btn" href="${escapeHtml(homeHref)}">回到前台</a>
+                        ${showBackendLink ? `<a class="ghost-btn" href="${escapeHtml(backendHref)}">进入可用后台</a>` : ""}
+                        ${user ? `<button class="ghost-btn" id="forbidden-logout" type="button">退出登录</button>` : `<a class="ghost-btn" href="#/login">前往登录</a>`}
                     </div>
                 </section>
             </main>
         `;
+        const logoutButton = document.getElementById("forbidden-logout");
+        if (logoutButton) {
+            logoutButton.addEventListener("click", async () => {
+                try {
+                    await api("/api/users/logout", { method: "POST" });
+                } catch (error) {
+                    // Local cleanup still matters when the token is already invalid.
+                }
+                clearAuth();
+                window.location.hash = "#/";
+                render();
+            });
+        }
     }
 
     function userShell(route, user, content) {
@@ -871,11 +1810,14 @@
                 <header class="mis-user-header">
                     <a class="mis-brand" href="#/"><span>HFUT</span><strong>校园流浪猫认养门户</strong></a>
                     <nav>${userNav(route.path, user)}</nav>
-                    <div class="mis-user-chip">${user ? `${backendEntry(user)}<a href="#/profile">${escapeHtml(user.userName)} · ${escapeHtml(roleLabels[role] || role)}</a><button id="mis-logout" type="button">退出</button>` : `<a href="#/login">登录</a><a href="#/register">注册</a>`}</div>
+                    <div class="mis-user-chip">${languageSwitcher()}${user ? `${backendEntry(user)}<a href="#/profile">${escapeHtml(user.userName)} · ${escapeHtml(roleLabels[role] || role)}</a><button id="mis-logout" type="button">退出</button>` : `<a href="#/login">登录</a><a href="#/register">注册</a>`}</div>
                 </header>
                 <main class="mis-user-main">${content}</main>
             </div>
         `;
+        bindLanguageSwitcher();
+        applyLocale();
+        startLocaleObserver();
         const logoutButton = document.getElementById("mis-logout");
         if (logoutButton) {
             logoutButton.addEventListener("click", async () => {
@@ -906,12 +1848,15 @@
                             <input id="admin-global-search" placeholder="全局搜索猫咪、线索、申请、协议、预警">
                             <div id="admin-search-panel" class="mis-search-panel"></div>
                         </div>`}
-                        <div class="mis-user-chip"><a class="ghost-btn compact" href="#/">返回前台</a><span>${escapeHtml(user.userName)} · ${escapeHtml(roleLabels[role] || role)}</span><button id="mis-admin-logout" type="button">退出</button></div>
+                        <div class="mis-user-chip">${languageSwitcher()}<a class="ghost-btn compact" href="#/">返回前台</a><span>${escapeHtml(user.userName)} · ${escapeHtml(roleLabels[role] || role)}</span><button id="mis-admin-logout" type="button">退出</button></div>
                     </header>
                     <main class="mis-admin-main">${content}</main>
                 </div>
             </div>
         `;
+        bindLanguageSwitcher();
+        applyLocale();
+        startLocaleObserver();
         setTimeout(bindAdminGlobalSearch, 0);
         const logoutButton = document.getElementById("mis-admin-logout");
         if (logoutButton) {
@@ -1119,35 +2064,26 @@
                         <option value="翡翠湖校区">翡翠湖校区</option>
                         <option value="屯溪路校区">屯溪路校区</option>
                         <option value="宣城校区">宣城校区</option>
-                        <option value="教学区">教学区</option>
-                        <option value="宿舍区">宿舍区</option>
-                        <option value="食堂周边">食堂周边</option>
-                        <option value="图书馆周边">图书馆周边</option>
-                        <option value="运动场周边">运动场周边</option>
-                        <option value="校医院周边">校医院周边</option>
-                        <option value="快递站周边">快递站周边</option>
-                        <option value="校门周边">校门周边</option>
-                        <option value="绿化带/草坪">绿化带/草坪</option>
-                        <option value="__custom__">新增/自定义校园区域</option>
                     </select>
-                    <input name="foundArea" class="clue-custom-input" placeholder="请输入新的校园区域">
+
                     <button class="ghost-btn compact add-choice-btn" type="button" data-save-custom="foundArea">保存到下拉框</button>
                 </label>
                 <label class="wide clue-select-field">发现地点
                     <select id="found-location-select" class="clue-choice-select">
                         <option value="">请选择发现地点</option>
-                        <option value="翡翠湖校区二食堂北门">二食堂北门</option>
-                        <option value="翡翠湖校区图书馆东侧">图书馆东侧</option>
-                        <option value="翡翠湖校区宿舍区楼下">宿舍区楼下</option>
-                        <option value="翡翠湖校区教学楼附近">教学楼附近</option>
-                        <option value="翡翠湖校区东门附近">东门附近</option>
-                        <option value="翡翠湖校区操场看台">操场看台</option>
-                        <option value="翡翠湖校区快递站附近">快递站附近</option>
-                        <option value="翡翠湖校区校医院门口">校医院门口</option>
-                        <option value="翡翠湖校区湖边草坪">湖边草坪</option>
-                        <option value="屯溪路校区主楼附近">屯溪路主楼</option>
-                        <option value="屯溪路校区南门附近">屯溪路南门</option>
-                        <option value="宣城校区食堂附近">宣城食堂</option>
+                        <option value="图书馆东侧">图书馆东侧</option>
+                        <option value="宿舍区楼下">宿舍区楼下</option>
+                        <option value="东门附近">东门附近</option>
+                        <option value="西门附近">西门附近</option>
+                        <option value="南门附近">南门附近</option>
+                        <option value="北门附近">北门附近</option>
+                        <option value="操场看台">操场看台</option>
+                        <option value="快递站附近">快递站附近</option>
+                        <option value="校医院门口">校医院门口</option>
+                        <option value="湖边草坪">湖边草坪</option>
+                        <option value="主教学楼附近">主教学楼</option>
+                        <option value="西二楼附近">西二教学楼</option>
+                        <option value="食堂附近">食堂</option>
                         <option value="__custom__">新增/自定义发现地点</option>
                     </select>
                     <input name="foundLocation" class="clue-custom-input" placeholder="请输入新的发现地点">
@@ -1597,18 +2533,17 @@
                 ], "business-summary")}
                 <div class="mis-section-head"><h2>医院协作入口</h2><span>${escapeHtml(user.college || "合作医院")} · ${escapeHtml(user.userName)}</span></div>
                 <div class="hospital-entry-actions">
-                    <a class="primary-btn" href="#/admin/hospital">进入医院后台首页</a>
-                    <a class="ghost-btn" href="#/admin/medical">维护医疗记录</a>
+                    <a class="primary-btn" href="#/admin/medical">进入医院工作台</a>
                     <a class="ghost-btn" href="#/admin/medical?status=MEDICAL">处理医疗中猫咪</a>
                     <a class="ghost-btn" href="#/admin/medical?status=OBSERVING">查看观察中猫咪</a>
                     <a class="ghost-btn" href="#/profile">个人中心</a>
                 </div>
                 <h3>待医疗猫咪</h3>
-                <div class="mis-cat-grid showcase">
+                <div class="mis-cat-grid showcase hospital-portal-cat-grid">
                     ${(medicalCats || []).slice(0, 4).map(cat => homeCatCard(cat).replaceAll("#/cats/", "#/admin/cats/")).join("") || `<div class="mis-empty">暂无医疗中猫咪</div>`}
                 </div>
                 <h3>观察中猫咪</h3>
-                <div class="mis-cat-grid showcase">
+                <div class="mis-cat-grid showcase hospital-portal-cat-grid">
                     ${(observingCats || []).slice(0, 4).map(cat => homeCatCard(cat).replaceAll("#/cats/", "#/admin/cats/")).join("") || `<div class="mis-empty">暂无观察中猫咪</div>`}
                 </div>
                 <h3>最近医疗记录</h3>
@@ -1716,17 +2651,13 @@
     }
 
     async function renderAdminClues(route, user) {
-        const isVolunteerFront = route.path === "#/volunteer/clues";
-        const content = `${isVolunteerFront ? pageHero(route) : adminHero(route)}<section class="mis-table-panel"><div class="mis-loading">正在加载线索...</div></section>`;
-        if (isVolunteerFront) {
-            userShell(route, user, content);
-        } else {
-            adminShell(route, user, content);
-        }
+        const content = `${adminHero(route)}<section class="mis-table-panel"><div class="mis-loading">正在加载线索...</div></section>`;
+        adminShell(route, user, content);
         await loadAdminClues();
     }
 
     async function renderAdminCats(route, user) {
+        // 后台猫咪档案页：根据地址栏筛选参数请求列表，保持刷新页面后筛选条件不丢失。
         adminShell(route, user, `${adminHero(route)}<section class="mis-table-panel"><div class="mis-loading">正在加载猫咪档案...</div></section>`);
         const panel = shell.querySelector(".mis-table-panel");
         try {
@@ -1781,6 +2712,7 @@
 
     function bindAdminCatEvents(cats, user) {
         document.getElementById("admin-cat-search").addEventListener("click", () => {
+            // 筛选条件写回 hash，由路由重新渲染页面，避免手动维护多份列表状态。
             const query = new URLSearchParams();
             const status = document.getElementById("admin-cat-status").value;
             const health = document.getElementById("admin-cat-health").value;
@@ -1903,66 +2835,6 @@
                 </div>
                 <h3>医疗记录时间线</h3>${timelineList(medical.map(item => ({ title: item.healthLevel, description: item.treatment || item.doctorNote, eventTime: item.createdAt })))}
                 <h3>生命周期时间线</h3>${timelineList(timeline)}
-            `;
-        } catch (error) {
-            panel.innerHTML = `<div class="mis-error">${escapeHtml(error.message)}</div>`;
-        }
-    }
-
-    async function renderAdminHospital(route, user) {
-        adminShell(route, user, `${adminHero(route)}<section class="mis-table-panel"><div class="mis-loading">正在加载医院后台...</div></section>`);
-        const panel = shell.querySelector(".mis-table-panel");
-        const hideClueFeatures = isHospitalUser(user);
-        try {
-            const [summary, medicalCats, observingCats, records] = await Promise.all([
-                api("/api/admin/hospital/summary"),
-                api("/api/admin/cats?status=MEDICAL").catch(() => []),
-                api("/api/admin/cats?status=OBSERVING").catch(() => []),
-                api("/api/admin/hospital/records?limit=12").catch(() => [])
-            ]);
-            panel.innerHTML = `
-                <section class="hospital-home">
-                    <div class="hospital-home-hero">
-                        <div>
-                            <p class="eyebrow">MEDICAL WORKBENCH</p>
-                            <h2>${escapeHtml(user.college || "合作医院")}医疗协作台</h2>
-                            <span>集中查看医疗中、观察中、异常记录和疫苗绝育待办，优先处理需要医生判断的猫咪。</span>
-                        </div>
-                        <div class="hospital-home-actions">
-                            <a class="primary-btn" href="#/admin/medical?status=MEDICAL">处理医疗中猫咪</a>
-                            <a class="ghost-btn" href="#/admin/medical">新增医疗记录</a>
-                            <a class="ghost-btn" href="#/hospital">返回医疗协作前台</a>
-                        </div>
-                    </div>
-                    <div class="hospital-kpi-grid">
-                        ${[
-                            { label: "医疗中", value: summary.medicalCatCount ?? 0, hint: "需诊疗处理" },
-                            { label: "观察中", value: summary.observingCatCount ?? 0, hint: "需复查关注" },
-                            { label: "异常记录", value: summary.abnormalRecordCount ?? 0, hint: "健康风险" },
-                            { label: "本院记录", value: summary.myRecordCount ?? 0, hint: "已录入" },
-                            { label: "待疫苗", value: summary.pendingVaccineCount ?? 0, hint: "免疫待办" },
-                            { label: "待绝育", value: summary.pendingSterilizationCount ?? 0, hint: "手术待办" }
-                        ].map(item => `<article><span>${escapeHtml(item.label)}</span><strong>${escapeHtml(item.value)}</strong><small>${escapeHtml(item.hint)}</small></article>`).join("")}
-                    </div>
-                    <div class="hospital-home-grid">
-                        <section class="hospital-work-card">
-                            <div class="mis-section-head"><h2>待医疗猫咪</h2><a href="#/admin/medical?status=MEDICAL">查看全部</a></div>
-                            <div class="hospital-cat-list">
-                                ${(medicalCats || []).slice(0, 5).map(cat => hospitalCatRow(cat, "medical")).join("") || `<div class="mis-empty">暂无医疗中猫咪</div>`}
-                            </div>
-                        </section>
-                        <section class="hospital-work-card">
-                            <div class="mis-section-head"><h2>观察中猫咪</h2><a href="#/admin/medical?status=OBSERVING">查看全部</a></div>
-                            <div class="hospital-cat-list">
-                                ${(observingCats || []).slice(0, 5).map(cat => hospitalCatRow(cat, "observe")).join("") || `<div class="mis-empty">暂无观察中猫咪</div>`}
-                            </div>
-                        </section>
-                    </div>
-                    <section class="hospital-record-card">
-                        <div class="mis-section-head"><h2>最近医疗记录</h2><a href="#/admin/medical">维护记录</a></div>
-                        <div class="mis-table-wrap"><table class="mis-table"><thead><tr><th>编号</th><th>猫咪</th><th>日期</th><th>健康</th><th>说明</th><th>医院</th></tr></thead><tbody>${medicalRecordRows(records)}</tbody></table></div>
-                    </section>
-                </section>
             `;
         } catch (error) {
             panel.innerHTML = `<div class="mis-error">${escapeHtml(error.message)}</div>`;
@@ -2097,7 +2969,7 @@
                         </select>
                         ${cats.length ? `<select id="medical-cat-select">${cats.map(cat => `<option value="${cat.catId}" ${currentCat === cat.catId ? "selected" : ""}>${cat.catId} · ${escapeHtml(cat.catName || "待命名")} · ${catStatusLabels[cat.status]?.label || cat.status}</option>`).join("")}</select>` : `<input id="medical-cat-select" value="${escapeHtml(currentCat)}" placeholder="输入猫咪编号，如 CAT260501001">`}
                         <button class="ghost-btn" id="medical-cat-jump">查看</button>
-                        <a class="ghost-btn" href="#/admin/hospital">医院首页</a>
+                        <a class="ghost-btn" href="#/hospital">医疗协作门户</a>
                     </div>
                     <div class="medical-current-card">
                         <img ${imageAttrs(selectedCat?.coverUrl, "medical-current-photo", "当前猫咪照片")}>
@@ -2260,6 +3132,7 @@
     }
 
     async function renderAdminAdoptionAudits(route, user) {
+        // 认养审核页：志愿者处理初审，管理员处理终审，列表同时展示评分和风险等级。
         adminShell(route, user, `${adminHero(route)}<section class="mis-table-panel"><div class="mis-loading">正在加载认养申请...</div></section>`);
         const panel = shell.querySelector(".mis-table-panel");
         try {
@@ -2446,8 +3319,7 @@ ${audits || "暂无"}`;
             if (status) query.set("status", status);
             if (urgency) query.set("urgencyLevel", urgency);
             if (keyword) query.set("keyword", keyword);
-            const baseHash = location.hash.split("?")[0] === "#/volunteer/clues" ? "#/volunteer/clues" : "#/admin/clues";
-            window.location.hash = `${baseHash}${query.toString() ? `?${query}` : ""}`;
+            window.location.hash = `#/admin/clues${query.toString() ? `?${query}` : ""}`;
         });
         shell.querySelectorAll("[data-detail]").forEach(button => button.addEventListener("click", () => {
             const clue = clues.find(item => item.id === button.dataset.detail);
@@ -2522,9 +3394,8 @@ ${audits || "暂无"}`;
             const rows = await api(`/api/admin/agreements/pending${query.toString() ? `?${query}` : ""}`);
             panel.innerHTML = `
                 ${summaryCards([
-                    { label: "交接记录", value: rows.length },
-                    { label: "未生成协议", value: countRows(rows, item => !item.id) },
-                    { label: "待交接", value: countRows(rows, item => ["GENERATED", "DRAFT"].includes(item.status)) },
+                    { label: "协议记录", value: countRows(rows, item => item.id) },
+                    { label: "待交接", value: countRows(rows, item => item.id && ["GENERATED", "DRAFT"].includes(item.status)) },
                     { label: "已交接", value: countRows(rows, item => item.status === "HANDED_OVER") },
                     { label: "已取消", value: countRows(rows, item => item.status === "CANCELLED") }
                 ], "business-summary")}
@@ -2537,7 +3408,7 @@ ${audits || "暂无"}`;
                 <div class="mis-table-wrap"><table class="mis-table"><thead><tr><th>申请编号</th><th>协议编号</th><th>猫咪</th><th>认养人</th><th>终审时间</th><th>协议状态</th><th>交接信息</th><th>操作</th></tr></thead><tbody>
                     ${rows.map(row => `<tr>
                         <td>${escapeHtml(row.applicationId)}</td>
-                        <td>${escapeHtml(row.agreementNo || "未生成")}</td>
+                        <td>${escapeHtml(row.agreementNo || "系统自动生成中")}</td>
                         <td>${escapeHtml(row.catName || row.catId)}</td>
                         <td>${escapeHtml(row.adopterName || row.adopterId)}<br><small>${escapeHtml(row.adopterPhone || "")}</small></td>
                         <td>${escapeHtml((row.finalApprovedAt || "").replace("T", " "))}</td>
@@ -2545,8 +3416,8 @@ ${audits || "暂无"}`;
                         <td>${row.handoverTime ? `${escapeHtml(row.handoverLocation || "-")}<br><small>${escapeHtml(row.handoverTime.replace("T", " "))}</small>` : "待交接"}</td>
                         <td>
                             ${row.id ? `<button class="ghost-btn" data-agreement-detail="${row.id}">查看</button>` : ""}
-                            ${user.role === "ADMIN" && !row.id ? `<button class="primary-btn" data-agreement-generate="${escapeHtml(row.applicationId)}">生成协议</button>` : ""}
-                            ${user.role === "ADMIN" && row.id && (row.status === "GENERATED" || row.status === "DRAFT") ? `<button class="ghost-btn" data-agreement-edit="${row.id}">编辑</button><button class="ghost-btn" data-agreement-cancel="${row.id}">取消</button><button class="primary-btn" data-agreement-handover="${row.id}">完成交接</button>` : ""}
+                            ${user.role === "ADMIN" && row.id && (row.status === "GENERATED" || row.status === "DRAFT") ? `<button class="ghost-btn" data-agreement-edit="${row.id}">编辑</button><button class="ghost-btn" data-agreement-cancel="${row.id}">作废</button><button class="ghost-btn" data-agreement-delete="${row.id}">删除</button><button class="primary-btn" data-agreement-handover="${row.id}">完成交接</button>` : ""}
+                            ${user.role === "ADMIN" && row.id && row.status === "CANCELLED" ? `<button class="ghost-btn" data-agreement-delete="${row.id}">删除</button>` : ""}
                         </td>
                     </tr>`).join("") || `<tr><td colspan="8"><div class="mis-empty">暂无待交接记录</div></td></tr>`}
                 </tbody></table></div>
@@ -2563,10 +3434,6 @@ ${audits || "暂无"}`;
                 const detail = await api(`/api/admin/agreements/${button.dataset.agreementDetail}`);
                 alert(agreementDetailText(detail));
             }));
-            shell.querySelectorAll("[data-agreement-generate]").forEach(button => button.addEventListener("click", async () => {
-                await api(`/api/admin/agreements/${button.dataset.agreementGenerate}/generate`, { method: "POST" });
-                renderAdminAgreements(route, user);
-            }));
             shell.querySelectorAll("[data-agreement-edit]").forEach(button => button.addEventListener("click", async () => {
                 const detail = await api(`/api/admin/agreements/${button.dataset.agreementEdit}`);
                 const agreementContent = prompt("协议正文", detail.agreementContent || "");
@@ -2576,12 +3443,26 @@ ${audits || "暂无"}`;
                 renderAdminAgreements(route, user);
             }));
             shell.querySelectorAll("[data-agreement-cancel]").forEach(button => button.addEventListener("click", async () => {
-                if (!confirm("确认取消该未交接协议？")) return;
-                const reason = prompt("请输入取消原因");
+                if (!confirm("确认作废该未交接协议？")) return;
+                const reason = prompt("请输入作废原因");
                 if (!reason) return;
                 try {
                     await api(`/api/admin/agreements/${button.dataset.agreementCancel}/cancel`, {
                         method: "PUT",
+                        body: JSON.stringify({ reason })
+                    });
+                    renderAdminAgreements(route, user);
+                } catch (error) {
+                    alert(error.message);
+                }
+            }));
+            shell.querySelectorAll("[data-agreement-delete]").forEach(button => button.addEventListener("click", async () => {
+                if (!confirm("确认删除该未交接协议？删除后不再显示在协议列表中。")) return;
+                const reason = prompt("请输入删除原因");
+                if (!reason) return;
+                try {
+                    await api(`/api/admin/agreements/${button.dataset.agreementDelete}`, {
+                        method: "DELETE",
                         body: JSON.stringify({ reason })
                     });
                     renderAdminAgreements(route, user);
@@ -2640,13 +3521,9 @@ ${detail.agreementContent || "-"}`;
     }
 
     async function renderAdminFollowups(route, user) {
-        const isVolunteerFront = route.path === "#/volunteer/followups";
-        const content = `${isVolunteerFront ? pageHero(route) : adminHero(route)}<section class="mis-table-panel"><div class="mis-loading">正在加载回访任务...</div></section>`;
-        if (isVolunteerFront) {
-            userShell(route, user, content);
-        } else {
-            adminShell(route, user, content);
-        }
+        // 回访任务页：后台读取任务列表前由后端刷新逾期状态，前端只负责展示和触发操作。
+        const content = `${adminHero(route)}<section class="mis-table-panel"><div class="mis-loading">正在加载回访任务...</div></section>`;
+        adminShell(route, user, content);
         const panel = shell.querySelector(".mis-table-panel");
         try {
             const params = new URLSearchParams(location.hash.split("?")[1] || "");
@@ -2656,7 +3533,7 @@ ${detail.agreementContent || "-"}`;
             });
             const tasks = await api(`/api/admin/followup/tasks${query.toString() ? `?${query}` : ""}`);
             panel.innerHTML = `${followupSummaryCards(tasks)}${followupTaskTable(tasks, true, params.get("status") || "", params.get("planDate") || "", params.get("keyword") || "", params.get("taskType") || "", user)}`;
-            bindFollowupFilter(route.path === "#/volunteer/followups" ? "#/volunteer/followups" : "#/admin/followups");
+            bindFollowupFilter("#/admin/followups");
             bindFollowupTaskActions(route, user, true);
         } catch (error) {
             panel.innerHTML = `<div class="mis-error">${escapeHtml(error.message)}</div>`;
@@ -3131,14 +4008,14 @@ ${followupRecordsText(records, task)}`;
                 </div>
                 <div class="mis-table-wrap"><table class="mis-table"><thead><tr><th>标题</th><th>类型</th><th>等级</th><th>猫咪</th><th>认养人</th><th>状态</th><th>创建时间</th><th>操作</th></tr></thead><tbody>
                     ${(warnings || []).map(item => `<tr>
-                        <td>${escapeHtml(item.title)}</td>
+                        <td>${escapeHtml(warningDisplayTitle(item))}</td>
                         <td>${tag(item.warningType, warningTypeLabels)}</td>
                         <td>${tag(item.warningLevel, riskLabels)}</td>
                         <td>${escapeHtml(item.catName || item.catId || "-")}</td>
                         <td>${escapeHtml(item.userName || item.userId || "-")}</td>
                         <td>${tag(item.status, warningStatusLabels)}</td>
                         <td>${escapeHtml((item.createTime || "").replace("T", " "))}</td>
-                        <td><button class="ghost-btn" data-warning-detail="${item.id}">详情</button>${user.role === "ADMIN" && !["HANDLED", "IGNORED"].includes(item.status) ? `<button class="primary-btn" data-warning-handle="${item.id}">处理</button>` : ""}</td>
+                        <td><button class="ghost-btn" data-warning-detail="${item.id}">详情</button>${user.role === "ADMIN" && !["HANDLED", "IGNORED"].includes(item.status) ? `<button class="primary-btn" data-warning-handle="${item.id}">处理</button>` : ""}${user.role === "ADMIN" ? `<button class="ghost-btn" data-warning-delete="${item.id}">删除</button>` : ""}</td>
                     </tr>`).join("") || `<tr><td colspan="8"><div class="mis-empty">暂无异常预警</div></td></tr>`}
                 </tbody></table></div>
             `;
@@ -3177,22 +4054,54 @@ ${followupRecordsText(records, task)}`;
                 });
                 renderAdminWarnings(route, user);
             }));
+            shell.querySelectorAll("[data-warning-delete]").forEach(button => button.addEventListener("click", async () => {
+                if (!confirm("确认删除该异常预警？删除后列表不再显示。")) return;
+                await api(`/api/admin/warnings/${button.dataset.warningDelete}`, { method: "DELETE" });
+                renderAdminWarnings(route, user);
+            }));
         } catch (error) {
             panel.innerHTML = `<div class="mis-error">${escapeHtml(error.message)}</div>`;
         }
     }
 
     function warningDetailText(item) {
-        return `预警：${item.title}
+        return `预警：${warningDisplayTitle(item)}
 类型：${warningTypeLabels[item.warningType]?.label || item.warningType}
 等级：${riskLabels[item.warningLevel]?.label || item.warningLevel}
 状态：${warningStatusLabels[item.status]?.label || item.status}
 猫咪：${item.catName || item.catId || "-"}
 认养人：${item.userName || item.userId || "-"}
-内容：${item.content || "-"}
+内容：${warningDisplayContent(item)}
 处理人：${item.handlerName || item.handlerId || "-"}
 处理意见：${item.handleComment || "-"}
 处理时间：${(item.handleTime || "-").replace("T", " ")}`;
+    }
+
+    function warningDisplayTitle(item) {
+        const title = item?.title || "";
+        const cat = item?.catName || item?.catId || "";
+        if (title.startsWith("High risk application warning")) return `高风险申请预警${cat ? `：${cat}` : ""}`;
+        if (title.startsWith("Medical abnormal warning")) return `健康异常预警${cat ? `：${cat}` : ""}`;
+        if (title.startsWith("Abnormal follow-up:")) return `回访异常：${cat || title.replace("Abnormal follow-up:", "").trim() || "-"}`;
+        if (title.startsWith("Follow-up overdue:")) return `回访逾期：${cat || title.replace("Follow-up overdue:", "").trim() || "-"}`;
+        if (title.startsWith("Follow-up warning:")) return `回访预警：${cat || title.replace("Follow-up warning:", "").trim() || "-"}`;
+        return title || `${warningTypeLabels[item?.warningType]?.label || "异常预警"}${cat ? `：${cat}` : ""}`;
+    }
+
+    function warningDisplayContent(item) {
+        const content = item?.content || "";
+        if (content.startsWith("Cat: ")) {
+            return content
+                .replace("Cat: ", "猫咪：")
+                .replace("; adopter: ", "；认养人：")
+                .replace("; planDate: ", "；计划日期：")
+                .replace("; taskType: ", "；回访类型：")
+                .replace("; detail: ", "；详情：");
+        }
+        if (content.startsWith("Follow-up task is overdue. Planned date: ")) {
+            return `回访任务已逾期，计划日期：${content.replace("Follow-up task is overdue. Planned date: ", "")}`;
+        }
+        return content || "-";
     }
 
     async function renderAdminUsers(route, user) {
@@ -3312,6 +4221,9 @@ ${followupRecordsText(records, task)}`;
         if (redirect.startsWith("#/admin")) {
             const user = currentUser();
             const route = findRoute(redirect.split("?")[0]);
+            if (isHospitalUser(user) && redirect.split("?")[0] === "#/admin/dashboard") {
+                return "#/admin/medical";
+            }
             return user && route && normalizeRole(user.role) !== "STUDENT" && canVisit(route, user.role) ? redirect : "#/403";
         }
         return redirect.startsWith("#/") ? redirect : defaultHash;
@@ -3320,12 +4232,13 @@ ${followupRecordsText(records, task)}`;
     function roleLanding(user) {
         const role = normalizeRole(user?.role);
         if (!user) return "#/";
-        if (role === "HOSPITAL") return "#/admin/hospital";
+        if (role === "HOSPITAL") return "#/admin/medical";
         if (role === "VOLUNTEER" || role === "ADMIN") return "#/admin/dashboard";
         return "#/profile";
     }
 
     async function renderLogin(route, user) {
+        // 登录页提交账号密码后，再调用 /api/users/me 校验 token，确保前端角色信息与后端一致。
         if (user) {
             window.location.hash = redirectTarget("#/");
             return;
@@ -3468,6 +4381,7 @@ ${followupRecordsText(records, task)}`;
                 api("/api/notices").catch(() => []),
                 loadRolePortalData(user)
             ]);
+            const visibleNotices = filterNoticesForUser(notices, user);
             panel.innerHTML = `
                 <section class="hero">
                     <div class="hero-copy">
@@ -3546,7 +4460,7 @@ ${followupRecordsText(records, task)}`;
                             <a class="ghost-btn compact" href="#/notices">全部公告</a>
                         </div>
                         <div class="home-notice-list">
-                            ${(notices || []).map(item => {
+                            ${visibleNotices.map(item => {
                                 const meta = noticeMeta(item);
                                 return `
                                     <article class="home-notice-card">
@@ -3649,7 +4563,7 @@ ${followupRecordsText(records, task)}`;
         userShell(route, user, `${pageHero(route)}<section class="mis-table-panel"><div class="mis-loading">正在加载公告...</div></section>`);
         const panel = shell.querySelector(".mis-table-panel");
         try {
-            const notices = await api("/api/notices");
+            const notices = filterNoticesForUser(await api("/api/notices"), user);
             panel.innerHTML = `
                 <div class="notice-list enhanced">
                     ${(notices || []).map(item => {
@@ -3685,6 +4599,10 @@ ${followupRecordsText(records, task)}`;
         const panel = shell.querySelector(".mis-table-panel");
         try {
             const notice = await api(`/api/notices/${noticeId}`);
+            if (!noticeVisibleForUser(notice, user)) {
+                panel.innerHTML = `<div class="mis-error">当前账号不在该公告的发布范围内。</div>`;
+                return;
+            }
             const meta = noticeMeta(notice);
             const summary = noticeSummary(notice);
             panel.innerHTML = `
@@ -4246,64 +5164,16 @@ ${followupRecordsText(records, task)}`;
         });
     }
 
-    async function renderAdminNotices(route, user) {
-        adminShell(route, user, `${adminHero(route)}<section class="mis-table-panel"><div class="mis-loading">正在加载公告...</div></section>`);
-        const panel = shell.querySelector(".mis-table-panel");
-        try {
-            const params = new URLSearchParams(location.hash.split("?")[1] || "");
-            const query = new URLSearchParams();
-            if (params.get("publishStatus")) query.set("publishStatus", params.get("publishStatus"));
-            if (params.get("noticeType")) query.set("noticeType", params.get("noticeType"));
-            const notices = await api(`/api/admin/notices${query.toString() ? `?${query}` : ""}`);
-            panel.innerHTML = `
-                <div class="mis-filter-row">
-                    <select id="notice-status"><option value="">全部状态</option>${["DRAFT", "PUBLISHED", "OFFLINE"].map(v => `<option value="${v}" ${params.get("publishStatus") === v ? "selected" : ""}>${v}</option>`).join("")}</select>
-                    <select id="notice-type"><option value="">全部类型</option>${["SYSTEM", "ADOPTION", "FOLLOWUP"].map(v => `<option value="${v}" ${params.get("noticeType") === v ? "selected" : ""}>${v}</option>`).join("")}</select>
-                    <button class="ghost-btn" id="notice-filter">筛选</button>
-                    <button class="primary-btn" id="notice-create">新增公告</button>
-                </div>
-                <div class="mis-table-wrap"><table class="mis-table"><thead><tr><th>标题</th><th>类型</th><th>状态</th><th>排序</th><th>发布时间</th><th>操作</th></tr></thead><tbody>
-                    ${(notices || []).map(item => `<tr><td>${escapeHtml(item.title)}<br><small>${escapeHtml(item.content)}</small></td><td>${escapeHtml(item.noticeType)}</td><td>${escapeHtml(item.publishStatus)}</td><td>${item.sortOrder || 0}</td><td>${escapeHtml((item.publishTime || "").replace("T", " "))}</td><td><button class="ghost-btn" data-notice-edit="${item.id}">编辑</button><button class="ghost-btn" data-notice-publish="${item.id}">发布</button><button class="ghost-btn" data-notice-offline="${item.id}">下架</button><button class="ghost-btn" data-notice-delete="${item.id}">删除</button></td></tr>`).join("") || `<tr><td colspan="6"><div class="mis-empty">暂无公告</div></td></tr>`}
-                </tbody></table></div>
-            `;
-            document.getElementById("notice-filter").addEventListener("click", () => {
-                const next = new URLSearchParams();
-                if (document.getElementById("notice-status").value) next.set("publishStatus", document.getElementById("notice-status").value);
-                if (document.getElementById("notice-type").value) next.set("noticeType", document.getElementById("notice-type").value);
-                window.location.hash = `#/admin/notices${next.toString() ? `?${next}` : ""}`;
-            });
-            document.getElementById("notice-create").addEventListener("click", async () => saveNotice(route, user));
-            shell.querySelectorAll("[data-notice-edit]").forEach(button => button.addEventListener("click", async () => saveNotice(route, user, button.dataset.noticeEdit)));
-            shell.querySelectorAll("[data-notice-publish]").forEach(button => button.addEventListener("click", async () => { await api(`/api/admin/notices/${button.dataset.noticePublish}/publish`, { method: "PUT" }); renderAdminNotices(route, user); }));
-            shell.querySelectorAll("[data-notice-offline]").forEach(button => button.addEventListener("click", async () => { await api(`/api/admin/notices/${button.dataset.noticeOffline}/offline`, { method: "PUT" }); renderAdminNotices(route, user); }));
-            shell.querySelectorAll("[data-notice-delete]").forEach(button => button.addEventListener("click", async () => { if (confirm("确认删除该公告？")) { await api(`/api/admin/notices/${button.dataset.noticeDelete}`, { method: "DELETE" }); renderAdminNotices(route, user); } }));
-        } catch (error) {
-            panel.innerHTML = `<div class="mis-error">${escapeHtml(error.message)}</div>`;
-        }
-    }
-
-    async function saveNotice(route, user, id) {
-        const title = prompt("公告标题");
-        if (!title) return;
-        const content = prompt("公告内容");
-        if (!content) return;
-        const noticeType = prompt("公告类型：SYSTEM / ADOPTION / FOLLOWUP", "SYSTEM") || "SYSTEM";
-        const publishStatus = prompt("发布状态：DRAFT / PUBLISHED / OFFLINE", "DRAFT") || "DRAFT";
-        const sortOrder = Number(prompt("排序值", "0") || "0");
-        const sendMessage = confirm("是否同步发送站内消息？");
-        const body = { title, content, noticeType, publishStatus, sortOrder, sendMessage };
-        await api(id ? `/api/admin/notices/${id}` : "/api/admin/notices", { method: id ? "PUT" : "POST", body: JSON.stringify(body) });
-        renderAdminNotices(route, user);
-    }
-
     async function renderFrontAdminNotices(route, user) {
-        userShell(route, user, `${pageHero(route)}<section class="mis-table-panel"><div class="mis-loading">正在加载公告发布台...</div></section>`);
+        // 公告管理页：表单和列表共用一个页面，edit 参数决定当前是新增还是编辑。
+        adminShell(route, user, `${adminHero(route)}<section class="mis-table-panel"><div class="mis-loading">正在加载公告发布台...</div></section>`);
         const panel = shell.querySelector(".mis-table-panel");
         try {
             const params = new URLSearchParams(location.hash.split("?")[1] || "");
             const query = new URLSearchParams();
             if (params.get("publishStatus")) query.set("publishStatus", params.get("publishStatus"));
             if (params.get("noticeType")) query.set("noticeType", params.get("noticeType"));
+            // 编辑时需要全量公告用于回显，筛选列表仍按当前筛选条件展示。
             const [notices, allNotices] = await Promise.all([
                 api(`/api/admin/notices${query.toString() ? `?${query}` : ""}`),
                 query.toString() ? api("/api/admin/notices") : Promise.resolve(null)
@@ -4326,7 +5196,6 @@ ${followupRecordsText(records, task)}`;
                             ${["DRAFT", "PUBLISHED", "OFFLINE"].map(status => `<option value="${status}" ${editing?.publishStatus === status ? "selected" : ""}>${noticeStatusLabel(status)}</option>`).join("")}
                         </select></label>
                         <label>排序<input name="sortOrder" type="number" value="${escapeHtml(editing?.sortOrder ?? 0)}"></label>
-                        <label class="check"><input name="sendMessage" type="checkbox"> <span>发布时同步发送站内消息</span></label>
                         <div class="wide notice-role-scope">
                             <strong>发布范围</strong>
                             <div>
@@ -4334,8 +5203,9 @@ ${followupRecordsText(records, task)}`;
                             </div>
                         </div>
                         <div class="wide notice-image-editor">
-                            <div class="notice-image-preview">
-                                <img id="front-notice-image-preview" ${imageAttrs(editing?.imageUrl || noticeMeta(editing || {}).image, "notice-edit-preview-image", "公告图片预览")}>
+                            <div class="notice-image-preview ${editing?.imageUrl ? "" : "is-empty"}">
+                                <img id="front-notice-image-preview" class="notice-edit-preview-image" src="${escapeHtml(editing?.imageUrl || "")}" alt="公告图片预览" ${editing?.imageUrl ? "" : "hidden"}>
+                                <span id="front-notice-image-placeholder">暂无公告图片</span>
                             </div>
                             <div class="notice-image-controls">
                                 <strong>公告图片</strong>
@@ -4344,13 +5214,13 @@ ${followupRecordsText(records, task)}`;
                                     <button class="ghost-btn compact" type="button" id="front-notice-upload-image">上传/更换图片</button>
                                     <button class="ghost-btn compact" type="button" id="front-notice-clear-image">移除图片</button>
                                 </div>
-                                <span id="front-notice-upload-message">${editing?.imageUrl ? "当前公告已设置图片" : "未上传时会使用默认公告配图"}</span>
+                                <span id="front-notice-upload-message">${editing?.imageUrl ? "当前公告已设置图片" : "未上传图片时公告不显示配图"}</span>
                             </div>
                         </div>
                         <label class="wide">公告内容<textarea name="content" rows="8" placeholder="填写公告正文，建议包含时间、地点、对象和注意事项" required>${escapeHtml(editing?.content || "")}</textarea></label>
                         <div class="mis-form-actions">
                             <button class="primary-btn">${editing ? "保存公告" : "新增公告"}</button>
-                            ${editing ? `<a class="ghost-btn" href="#/admin-notices">取消编辑</a>` : ""}
+                            ${editing ? `<a class="ghost-btn" href="#/admin/notices">取消编辑</a>` : ""}
                             <span id="front-notice-message"></span>
                         </div>
                     </form>
@@ -4371,7 +5241,7 @@ ${followupRecordsText(records, task)}`;
                                         <span>${noticeTypeLabel(item.noticeType)} · ${noticeStatusLabel(item.publishStatus)} · ${noticeRoleText(item.targetRoles)} · ${(item.publishTime || item.updateTime || "").replace("T", " ")}</span>
                                     </div>
                                     <div class="actions">
-                                        <a class="ghost-btn compact" href="#/admin-notices?edit=${encodeURIComponent(item.id)}">编辑</a>
+                                        <a class="ghost-btn compact" href="#/admin/notices?edit=${encodeURIComponent(item.id)}">编辑</a>
                                         <button class="ghost-btn compact" data-front-notice-publish="${escapeHtml(item.id)}">发布</button>
                                         <button class="ghost-btn compact" data-front-notice-offline="${escapeHtml(item.id)}">下架</button>
                                         <button class="ghost-btn compact" data-front-notice-delete="${escapeHtml(item.id)}">删除</button>
@@ -4410,6 +5280,7 @@ ${followupRecordsText(records, task)}`;
     }
 
     function noticeTargetRoleSet(value) {
+        // 后端按三范式存储角色关联，前端仍按逗号字符串处理，便于表单复选框回显。
         const roles = String(value || "STUDENT,VOLUNTEER,HOSPITAL,ADMIN").split(",").map(item => item.trim().toUpperCase()).filter(Boolean);
         return new Set(roles.length ? roles : noticeRoleOptions().map(item => item.value));
     }
@@ -4420,13 +5291,22 @@ ${followupRecordsText(records, task)}`;
         return labels.length === noticeRoleOptions().length ? "全部角色" : labels.join("、");
     }
 
+    function noticeVisibleForUser(notice, user) {
+        const role = normalizeRole(user?.role || "STUDENT");
+        return noticeTargetRoleSet(notice?.targetRoles).has(role);
+    }
+
+    function filterNoticesForUser(notices, user) {
+        return (notices || []).filter(item => noticeVisibleForUser(item, user));
+    }
+
     function frontNoticeBaseHash() {
         const next = new URLSearchParams();
         const status = document.getElementById("front-notice-status")?.value;
         const type = document.getElementById("front-notice-type")?.value;
         if (status) next.set("publishStatus", status);
         if (type) next.set("noticeType", type);
-        return `#/admin-notices${next.toString() ? `?${next}` : ""}`;
+        return `#/admin/notices${next.toString() ? `?${next}` : ""}`;
     }
 
     function bindFrontNoticeAdminEvents(route, user) {
@@ -4435,8 +5315,26 @@ ${followupRecordsText(records, task)}`;
         });
         const imageUrlInput = document.getElementById("front-notice-image-url");
         const imagePreview = document.getElementById("front-notice-image-preview");
+        const imagePreviewWrap = imagePreview?.closest(".notice-image-preview");
+        const imagePlaceholder = document.getElementById("front-notice-image-placeholder");
         const uploadMessage = document.getElementById("front-notice-upload-message");
-        document.getElementById("front-notice-upload-image")?.addEventListener("click", async () => {
+        const setNoticeImagePreview = url => {
+            // 图片上传成功后先更新隐藏字段和预览图，真正保存仍由公告表单提交完成。
+            const value = String(url || "").trim();
+            imageUrlInput.value = value;
+            if (value) {
+                imagePreview.src = value;
+                imagePreview.hidden = false;
+                imagePreviewWrap?.classList.remove("is-empty");
+                if (imagePlaceholder) imagePlaceholder.hidden = true;
+            } else {
+                imagePreview.removeAttribute("src");
+                imagePreview.hidden = true;
+                imagePreviewWrap?.classList.add("is-empty");
+                if (imagePlaceholder) imagePlaceholder.hidden = false;
+            }
+        };
+        const uploadNoticeImage = async () => {
             const file = document.getElementById("front-notice-image-file")?.files?.[0];
             if (!file) {
                 uploadMessage.textContent = "请先选择一张图片";
@@ -4446,21 +5344,23 @@ ${followupRecordsText(records, task)}`;
             button.disabled = true;
             uploadMessage.textContent = "正在上传 0%";
             try {
-                const result = await uploadFileWithProgress("/api/uploads/notices", file, percent => {
+                const result = await uploadNoticeImageFile(file, percent => {
                     uploadMessage.textContent = `正在上传 ${percent}%`;
                 });
-                imageUrlInput.value = result.url;
-                imagePreview.src = result.url;
+                setNoticeImagePreview(result.url);
                 uploadMessage.textContent = "图片已上传，保存公告后生效";
             } catch (error) {
                 uploadMessage.textContent = error.message;
             } finally {
                 button.disabled = false;
             }
+        };
+        document.getElementById("front-notice-upload-image")?.addEventListener("click", uploadNoticeImage);
+        document.getElementById("front-notice-image-file")?.addEventListener("change", () => {
+            uploadNoticeImage();
         });
         document.getElementById("front-notice-clear-image")?.addEventListener("click", () => {
-            imageUrlInput.value = "";
-            imagePreview.src = noticeMeta({}).image;
+            setNoticeImagePreview("");
             uploadMessage.textContent = "已移除图片，保存公告后生效";
         });
         shell.querySelectorAll('input[name="targetRoles"]').forEach(input => {
@@ -4475,12 +5375,18 @@ ${followupRecordsText(records, task)}`;
         });
         document.getElementById("front-notice-form").addEventListener("submit", async event => {
             event.preventDefault();
+            // 公告表单提交保持旧接口字段不变：title/content/status/imageUrl/targetRoles 一次性提交。
             const form = new FormData(event.currentTarget);
             const id = form.get("id");
             const message = document.getElementById("front-notice-message");
             const targetRoles = form.getAll("targetRoles").join(",");
             if (!targetRoles) {
                 message.textContent = "请至少选择一个发布范围";
+                return;
+            }
+            const selectedNoticeFile = document.getElementById("front-notice-image-file")?.files?.[0];
+            if (selectedNoticeFile && !String(form.get("imageUrl") || "").trim()) {
+                message.textContent = "图片还没有上传成功，请先上传完成后再保存公告";
                 return;
             }
             const body = {
@@ -4491,7 +5397,7 @@ ${followupRecordsText(records, task)}`;
                 sortOrder: Number(form.get("sortOrder") || 0),
                 imageUrl: form.get("imageUrl"),
                 targetRoles,
-                sendMessage: Boolean(form.get("sendMessage"))
+                sendMessage: true
             };
             try {
                 message.textContent = "正在保存...";
@@ -4500,7 +5406,7 @@ ${followupRecordsText(records, task)}`;
                     body: JSON.stringify(body)
                 });
                 message.textContent = "公告已保存";
-                window.location.hash = "#/admin-notices";
+                window.location.hash = "#/admin/notices";
                 renderFrontAdminNotices(route, user);
             } catch (error) {
                 message.textContent = error.message;
@@ -4525,6 +5431,7 @@ ${followupRecordsText(records, task)}`;
     }
 
     async function runFrontNoticeAction(button, pendingText, doneText, action, route, user) {
+        // 发布、下架、删除共用按钮状态处理，操作完成后重新加载公告列表。
         const oldText = button.textContent;
         const message = document.getElementById("front-notice-message") || document.getElementById("front-notice-upload-message");
         button.disabled = true;
@@ -4541,63 +5448,24 @@ ${followupRecordsText(records, task)}`;
         }
     }
 
-    async function renderAdminDicts(route, user) {
-        adminShell(route, user, `${adminHero(route)}<section class="mis-table-panel"><div class="mis-loading">正在加载字典...</div></section>`);
-        const panel = shell.querySelector(".mis-table-panel");
-        try {
-            const params = new URLSearchParams(location.hash.split("?")[1] || "");
-            const dictType = params.get("dictType") || "";
-            const items = await api(`/api/admin/dicts${dictType ? `?dictType=${dictType}` : ""}`);
-            panel.innerHTML = `
-                <div class="mis-filter-row"><input id="dict-type-filter" value="${escapeHtml(dictType)}" placeholder="字典类型"><button class="ghost-btn" id="dict-filter">筛选</button><button class="primary-btn" id="dict-create">新增字典项</button></div>
-                <div class="mis-table-wrap"><table class="mis-table"><thead><tr><th>类型</th><th>标签</th><th>值</th><th>排序</th><th>启用</th><th>备注</th><th>操作</th></tr></thead><tbody>
-                    ${(items || []).map(item => `<tr><td>${escapeHtml(item.dictType)}</td><td>${escapeHtml(item.dictLabel)}</td><td>${escapeHtml(item.dictValue)}</td><td>${item.sortOrder || 0}</td><td>${item.enabled ? "是" : "否"}</td><td>${escapeHtml(item.remark || "")}</td><td><button class="ghost-btn" data-dict-edit="${item.id}">编辑</button><button class="ghost-btn" data-dict-toggle="${item.id}" data-enabled="${!item.enabled}">${item.enabled ? "停用" : "启用"}</button><button class="ghost-btn" data-dict-delete="${item.id}">删除</button></td></tr>`).join("") || `<tr><td colspan="7"><div class="mis-empty">暂无字典项</div></td></tr>`}
-                </tbody></table></div>
-            `;
-            document.getElementById("dict-filter").addEventListener("click", () => {
-                const value = document.getElementById("dict-type-filter").value;
-                window.location.hash = value ? `#/admin/dicts?dictType=${encodeURIComponent(value)}` : "#/admin/dicts";
-            });
-            document.getElementById("dict-create").addEventListener("click", async () => saveDict(route, user, null, dictType));
-            shell.querySelectorAll("[data-dict-edit]").forEach(button => button.addEventListener("click", async () => saveDict(route, user, button.dataset.dictEdit, dictType)));
-            shell.querySelectorAll("[data-dict-toggle]").forEach(button => button.addEventListener("click", async () => { await api(`/api/admin/dicts/${button.dataset.dictToggle}/enabled?enabled=${button.dataset.enabled}`, { method: "PUT" }); renderAdminDicts(route, user); }));
-            shell.querySelectorAll("[data-dict-delete]").forEach(button => button.addEventListener("click", async () => { if (confirm("确认删除该字典项？")) { await api(`/api/admin/dicts/${button.dataset.dictDelete}`, { method: "DELETE" }); renderAdminDicts(route, user); } }));
-        } catch (error) {
-            panel.innerHTML = `<div class="mis-error">${escapeHtml(error.message)}</div>`;
-        }
-    }
-
-    async function saveDict(route, user, id, defaultType) {
-        const dictType = prompt("字典类型", defaultType || "CAT_STATUS");
-        if (!dictType) return;
-        const dictLabel = prompt("显示标签");
-        if (!dictLabel) return;
-        const dictValue = prompt("字典值");
-        if (!dictValue) return;
-        const sortOrder = Number(prompt("排序值", "0") || "0");
-        const enabled = confirm("是否启用？");
-        const remark = prompt("备注", "") || "";
-        await api(id ? `/api/admin/dicts/${id}` : "/api/admin/dicts", { method: id ? "PUT" : "POST", body: JSON.stringify({ dictType, dictLabel, dictValue, sortOrder, enabled, remark }) });
-        renderAdminDicts(route, user);
-    }
-
     async function renderAdminLogs(route, user) {
         adminShell(route, user, `${adminHero(route)}<section class="mis-table-panel"><div class="mis-loading">正在加载操作日志...</div></section>`);
         const panel = shell.querySelector(".mis-table-panel");
         try {
             const params = new URLSearchParams(location.hash.split("?")[1] || "");
             const query = new URLSearchParams();
-            ["operatorKeyword", "operationType", "bizType", "keyword"].forEach(key => { if (params.get(key)) query.set(key, params.get(key)); });
+            ["operatorKeyword", "operationType", "bizType", "status"].forEach(key => { if (params.get(key)) query.set(key, params.get(key)); });
             const logs = await api(`/api/admin/logs${query.toString() ? `?${query}` : ""}`);
+            const statusOptions = ["已完成", "待处理", "处理中", "已处理", "已忽略", "已删除", "已生成", "已发布", "已下架", "已取消", "已作废", "待交接", "已交接", "草稿"];
             panel.innerHTML = `
-                <div class="mis-filter-row"><input id="log-operator" value="${escapeHtml(params.get("operatorKeyword") || "")}" placeholder="操作人"><input id="log-type" value="${escapeHtml(params.get("operationType") || "")}" placeholder="操作类型"><input id="log-biz" value="${escapeHtml(params.get("bizType") || "")}" placeholder="业务类型"><input id="log-keyword" value="${escapeHtml(params.get("keyword") || "")}" placeholder="关键词"><button class="ghost-btn" id="log-filter">筛选</button></div>
+                <div class="mis-filter-row"><input id="log-operator" value="${escapeHtml(params.get("operatorKeyword") || "")}" placeholder="操作人"><input id="log-type" value="${escapeHtml(params.get("operationType") || "")}" placeholder="操作类型"><input id="log-biz" value="${escapeHtml(params.get("bizType") || "")}" placeholder="业务类型"><select id="log-status"><option value="">全部状态</option>${statusOptions.map(status => `<option value="${escapeHtml(status)}"${params.get("status") === status ? " selected" : ""}>${escapeHtml(status)}</option>`).join("")}</select><button class="ghost-btn" id="log-filter">筛选</button></div>
                 <div class="mis-table-wrap"><table class="mis-table"><thead><tr><th>时间</th><th>操作人</th><th>操作</th><th>业务</th><th>对象</th><th>状态</th><th>操作</th></tr></thead><tbody>
                     ${(logs || []).map(item => `<tr><td>${escapeHtml((item.createTime || "").replace("T", " "))}</td><td>${escapeHtml(item.operatorName || item.operatorId || "-")}</td><td>${escapeHtml(item.operationType)}</td><td>${escapeHtml(item.bizType)}</td><td>${escapeHtml(item.bizId)}</td><td>${escapeHtml(item.status)}</td><td><button class="ghost-btn" data-log-detail="${item.id}">详情</button></td></tr>`).join("") || `<tr><td colspan="7"><div class="mis-empty">暂无日志</div></td></tr>`}
                 </tbody></table></div>
             `;
             document.getElementById("log-filter").addEventListener("click", () => {
                 const next = new URLSearchParams();
-                [["operatorKeyword", "log-operator"], ["operationType", "log-type"], ["bizType", "log-biz"], ["keyword", "log-keyword"]].forEach(([key, id]) => {
+                [["operatorKeyword", "log-operator"], ["operationType", "log-type"], ["bizType", "log-biz"], ["status", "log-status"]].forEach(([key, id]) => {
                     const value = document.getElementById(id).value;
                     if (value) next.set(key, value);
                 });
@@ -4610,6 +5478,131 @@ ${followupRecordsText(records, task)}`;
         } catch (error) {
             panel.innerHTML = `<div class="mis-error">${escapeHtml(error.message)}</div>`;
         }
+    }
+
+    async function renderAdminLogsLocalized(route, user) {
+        adminShell(route, user, `${adminHero(route)}<section class="mis-table-panel"><div class="mis-loading">正在加载操作日志...</div></section>`);
+        const panel = shell.querySelector(".mis-table-panel");
+        try {
+            const params = new URLSearchParams(location.hash.split("?")[1] || "");
+            const query = new URLSearchParams();
+            ["operatorKeyword", "operationType", "bizType", "status"].forEach(key => { if (params.get(key)) query.set(key, params.get(key)); });
+            const logs = await api(`/api/admin/logs${query.toString() ? `?${query}` : ""}`);
+            const statusOptions = ["已完成", "待处理", "处理中", "已处理", "已忽略", "已删除", "已生成", "已发布", "已下架", "已取消", "已作废", "待交接", "已交接", "草稿"];
+            panel.innerHTML = `
+                <div class="mis-filter-row">
+                    <input id="log-operator" value="${escapeHtml(params.get("operatorKeyword") || "")}" placeholder="操作人">
+                    <input id="log-type" value="${escapeHtml(params.get("operationType") || "")}" placeholder="操作类型">
+                    <input id="log-biz" value="${escapeHtml(params.get("bizType") || "")}" placeholder="业务类型">
+                    <select id="log-status">
+                        <option value="">全部状态</option>
+                        ${statusOptions.map(status => `<option value="${escapeHtml(status)}"${params.get("status") === status ? " selected" : ""}>${escapeHtml(status)}</option>`).join("")}
+                    </select>
+                    <button class="ghost-btn" id="log-filter">筛选</button>
+                </div>
+                <div class="mis-table-wrap"><table class="mis-table"><thead><tr><th>时间</th><th>操作人</th><th>操作</th><th>业务</th><th>对象</th><th>状态</th><th>操作</th></tr></thead><tbody>
+                    ${(logs || []).map(item => `<tr>
+                        <td>${escapeHtml((item.createTime || "").replace("T", " "))}</td>
+                        <td>${escapeHtml(item.operatorName || item.operatorId || "-")}</td>
+                        <td>${escapeHtml(logOperationLabel(item.operationType))}</td>
+                        <td>${escapeHtml(logBizLabel(item.bizType))}</td>
+                        <td>${escapeHtml(item.bizId || "-")}</td>
+                        <td>${escapeHtml(logValueLabel(item.afterData || "-"))}</td>
+                        <td><button class="ghost-btn" data-log-detail="${item.id}">详情</button></td>
+                    </tr>`).join("") || `<tr><td colspan="7"><div class="mis-empty">暂无日志</div></td></tr>`}
+                </tbody></table></div>
+            `;
+            document.getElementById("log-filter").addEventListener("click", () => {
+                const next = new URLSearchParams();
+                [["operatorKeyword", "log-operator"], ["operationType", "log-type"], ["bizType", "log-biz"], ["status", "log-status"]].forEach(([key, id]) => {
+                    const value = document.getElementById(id).value;
+                    if (value) next.set(key, value);
+                });
+                window.location.hash = `#/admin/logs${next.toString() ? `?${next}` : ""}`;
+            });
+            shell.querySelectorAll("[data-log-detail]").forEach(button => button.addEventListener("click", async () => {
+                const item = await api(`/api/admin/logs/${button.dataset.logDetail}`);
+                alert(`操作人：${item.operatorName || item.operatorId || "-"}\n操作类型：${logOperationLabel(item.operationType)}\n业务：${logBizLabel(item.bizType)}/${item.bizId || "-"}\n变更前：${logValueLabel(item.beforeData || "-")}\n变更后：${logValueLabel(item.afterData || "-")}\n备注：${logValueLabel(item.remark || "-")}`);
+            }));
+        } catch (error) {
+            panel.innerHTML = `<div class="mis-error">${escapeHtml(error.message)}</div>`;
+        }
+    }
+
+    function logOperationLabel(value) {
+        return ({
+            "Auto-generate adoption agreement": "自动生成认养协议",
+            "Generate adoption agreement": "生成认养协议",
+            "Edit adoption agreement": "编辑认养协议",
+            "Cat enters follow-up after handover": "交接后猫咪进入回访",
+            "Complete adoption handover": "完成认养交接",
+            "Adoption application handed over": "认养申请已交接",
+            "Submit staff follow-up record": "工作人员填写回访记录",
+            "Submit adopter follow-up record": "认养人提交回访记录",
+            "Submit follow-up record": "提交回访记录",
+            "Mark follow-up abnormal": "标记回访异常",
+            "Handle warning": "处理异常预警",
+            "Delete warning": "删除异常预警",
+            "Create notice": "新增公告",
+            "Update notice": "更新公告",
+            "Publish notice": "发布公告",
+            "Offline notice": "下架公告",
+            "Delete notice": "删除公告",
+            "Create dict item": "新增字典项",
+            "Update dict item": "更新字典项",
+            "Toggle dict item": "启停字典项",
+            "Delete dict item": "删除字典项",
+            "Create follow-up tasks": "生成回访任务",
+            "Refresh overdue follow-up task": "刷新逾期回访任务",
+            "Create follow-up warning": "生成回访预警",
+            "Follow-up closed and cat adopted": "回访结束并标记已认养"
+        })[value] || value || "-";
+    }
+
+    function logBizLabel(value) {
+        return ({
+            USER: "用户",
+            CAT: "猫咪",
+            CLUE: "线索",
+            MEDICAL: "医疗记录",
+            APPLICATION: "认养申请",
+            AGREEMENT: "认养协议",
+            FOLLOWUP_TASK: "回访任务",
+            WARNING: "异常预警",
+            NOTICE: "公告",
+            DICT: "字典"
+        })[value] || value || "-";
+    }
+
+    function logValueLabel(value) {
+        return String(value || "-")
+            .replaceAll("PENDING_VERIFY", "待核实")
+            .replaceAll("VERIFIED_VALID", "已核实有效")
+            .replaceAll("CREATED_CAT", "已建档")
+            .replaceAll("INVALID", "无效")
+            .replaceAll("OBSERVING", "观察中")
+            .replaceAll("MEDICAL", "医疗中")
+            .replaceAll("ADOPTABLE", "可认养")
+            .replaceAll("APPLYING", "申请中")
+            .replaceAll("ADOPTED", "已认养")
+            .replaceAll("FOLLOWING", "回访中")
+            .replaceAll("PENDING_INITIAL", "待初审")
+            .replaceAll("PENDING_FINAL", "待终审")
+            .replaceAll("INITIAL_REJECTED", "初审拒绝")
+            .replaceAll("FINAL_REJECTED", "终审拒绝")
+            .replaceAll("PENDING_HANDOVER", "待交接")
+            .replaceAll("HANDED_OVER", "已交接")
+            .replaceAll("CANCELLED", "已取消")
+            .replaceAll("GENERATED", "已生成")
+            .replaceAll("COMPLETED", "已完成")
+            .replaceAll("HANDLED", "已处理")
+            .replaceAll("IGNORED", "已忽略")
+            .replaceAll("PROCESSING", "处理中")
+            .replaceAll("PENDING", "待处理")
+            .replaceAll("PUBLISHED", "已发布")
+            .replaceAll("OFFLINE", "已下架")
+            .replaceAll("DELETED", "已删除")
+            .replaceAll("VOID", "已作废");
     }
 
     function renderPlaceholder(route, user, isAdmin) {
@@ -4656,6 +5649,10 @@ ${followupRecordsText(records, task)}`;
         const isAdmin = route.path.startsWith("#/admin");
         if (isAdmin && !user) {
             window.location.hash = loginHashFor(hash);
+            return;
+        }
+        if (isAdmin && isHospitalUser(user) && cleanHash === "#/admin/dashboard") {
+            window.location.hash = "#/admin/medical";
             return;
         }
         if (isAdmin && (normalizeRole(user.role) === "STUDENT" || !canVisit(route, user.role))) {
@@ -4706,20 +5703,12 @@ ${followupRecordsText(records, task)}`;
             renderMyFollowups(route, user);
         } else if (route.path === "#/my/messages") {
             renderMyMessages(route, user);
-        } else if (route.path === "#/volunteer/clues") {
-            renderAdminClues(route, user);
-        } else if (route.path === "#/volunteer/followups") {
-            renderAdminFollowups(route, user);
-        } else if (route.path === "#/admin-notices") {
-            renderFrontAdminNotices(route, user);
         } else if (route.path === "#/hospital") {
             renderHospitalPortal(route, user);
         } else if (route.path === "#/profile") {
             renderProfile(route, user);
         } else if (route.path === "#/admin/dashboard") {
             renderAdminDashboard(route, user);
-        } else if (route.path === "#/admin/hospital") {
-            renderAdminHospital(route, user);
         } else if (route.path === "#/admin/clues") {
             renderAdminClues(route, user);
         } else if (route.path === "#/admin/adoption/audits") {
@@ -4739,11 +5728,9 @@ ${followupRecordsText(records, task)}`;
         } else if (route.path === "#/admin/users") {
             renderAdminUsers(route, user);
         } else if (route.path === "#/admin/notices") {
-            renderAdminNotices(route, user);
-        } else if (route.path === "#/admin/dicts") {
-            renderAdminDicts(route, user);
+            renderFrontAdminNotices(route, user);
         } else if (route.path === "#/admin/logs") {
-            renderAdminLogs(route, user);
+            renderAdminLogsLocalized(route, user);
         } else {
             renderPlaceholder(route, user, isAdmin);
         }

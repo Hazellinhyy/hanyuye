@@ -29,16 +29,104 @@ http://localhost:8080/#/
 
 默认密码均为 `123456`：
 
-- 普通用户：`user / 123456`
-- 志愿者：`volunteer / 123456`
-- 医院用户：`hospital / 123456`
-- 管理员：`admin / 123456`
+- 普通用户：`2024210008`
+- 志愿者：`2022210006`
+- 医院用户：`H2026002`
+- 管理员：`A2026002`
+- 当前本机数据库管理员：`A2026001`
 
-医院用户又称“合作医院”或“医疗协作用户”，统一对应角色 `HOSPITAL`，主要负责医疗记录录入、体检、疫苗、绝育记录和健康信息维护。历史演示账号 `2024210001`、`VOL001`、`HOSPITAL001`、`ADMIN001` 仍可作为兼容账号使用。
+医院用户又称“合作医院”或“医疗协作用户”，统一对应角色 `HOSPITAL`，主要负责医疗记录录入、体检、疫苗、绝育记录和健康信息维护。
+
+## 技术框架与运行环境
+
+本系统采用前后端一体化部署方式，后端负责 REST API 和静态资源托管，前端通过浏览器访问 `index.html` 和 `mis-router.js`。
+
+- 后端框架：Spring Boot 3、Spring Web、MyBatis 注解式 Mapper、Jakarta Validation
+- 前端框架：原生 HTML、CSS、JavaScript 单页路由，无需额外前端构建工具
+- 数据库：MySQL 8，当前库名为 `cat_adoption_system`
+- Java 版本：JDK 17 及以上
+- 构建工具：Maven
+- 认证方式：后端签发 Token，前端保存在 `localStorage`，请求时通过 `Authorization: Bearer ...` 传递
+
+## 实际运行命令
+
+Windows PowerShell：
+
+```powershell
+$env:MYSQL_URL="jdbc:mysql://localhost:3306/cat_adoption_system?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true&useSSL=false"
+$env:MYSQL_USERNAME="root"
+$env:MYSQL_PASSWORD="root"
+.\mvnw.cmd spring-boot:run
+```
+
+Linux / macOS Bash：
+
+```bash
+export MYSQL_URL="jdbc:mysql://localhost:3306/cat_adoption_system?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true&useSSL=false"
+export MYSQL_USERNAME="root"
+export MYSQL_PASSWORD="root"
+./mvnw spring-boot:run
+```
+
+数据库备份和恢复示例：
+
+```bash
+mysqldump -uroot -proot cat_adoption_system > cat_adoption_system_backup.sql
+mysql -uroot -proot -D cat_adoption_system < db_physical_3nf_cleanup.sql
+mysql -uroot -proot -D cat_adoption_system < db_notice_3nf_repair.sql
+```
+
+编译与前端脚本检查：
+
+```bash
+./mvnw -DskipTests compile
+node --check src/main/resources/static/mis-router.js
+```
+
+## 代码组成框架
+
+```text
+src/main/java/com/hfut/cat_adoption_system
+├── auth        权限注解、Token、登录上下文和拦截器
+├── common      统一响应、异常处理、数据质量校验
+├── config      Web 配置、历史数据补齐、三范式兼容迁移
+├── controller  前台和后台 REST 接口
+├── dto         前后端传输对象
+├── mapper      MyBatis 数据访问层
+├── model       业务实体和枚举
+└── service     核心业务编排服务
+
+src/main/resources/static
+├── index.html      前端入口页面
+├── mis-router.js   正式单页应用路由、接口请求、表单和页面渲染
+└── styles.css      前台和后台统一样式
+
+db_*.sql            数据库三范式调整、公告修复、风险标签补数据脚本
+cat_adoption_system_before_3nf_cleanup.sql  三范式改造前备份
+```
+
+## 数据库三范式设计说明
+
+当前物理库按课程要求尽量满足第三范式：
+
+- 主表只保存本实体的直接属性，例如 `t_notice` 只保存公告标题、正文、发布状态、发布人 ID 等。
+- 多值字段拆成关联表，例如公告发布范围拆到 `notice_target_role`，猫咪标签拆到 `cat_tag`，文章标签拆到 `article_tag`。
+- 风险标签拆成独立关系表，例如 `application_risk_tag`、`adoption_audit_risk_tag`，避免在申请表或审核表中保存逗号分隔字符串。
+- 冗余展示字段通过 Mapper 查询时 JOIN 或子查询聚合回来，保证前端接口字段不变。
+- 已取消的评论收藏功能已删除对应物理表：`t_comment`、`t_generic_collect`。
+
+三范式相关脚本：
+
+- `db_normalize_3nf.sql`：逻辑规范化和关联表补建脚本
+- `db_physical_3nf_cleanup.sql`：物理库冗余字段清理脚本
+- `db_remove_comment_collect_and_seed_risk_tags.sql`：删除评论收藏表并补风险标签数据
+- `db_notice_3nf_repair.sql`：修复公告发布人和公告角色关联数据
+
+
 
 ## 核心业务流程
 
-新版 MIS 正式演示流程如下：
+MIS 正式演示流程如下：
 
 1. 访客浏览前台首页、公告和可认养猫咪。
 2. 普通学生注册/登录后提交发现线索。
@@ -57,6 +145,26 @@ http://localhost:8080/#/
 15. 管理员处理预警。
 16. 系统消息通知和操作日志贯穿主流程。
 17. 全部关键回访完成后，猫咪可进入 `ADOPTED` 已认养状态。
+
+## 已实现功能
+
+- 用户注册、登录、资料维护、角色权限控制
+- 前台公告浏览、公告详情、按角色控制公告可见范围
+- 发现线索提交、志愿者核实、无效线索处理、有效线索生成猫咪档案
+- 猫咪档案维护、状态流转、标签、照片、生命周期时间线
+- 医疗记录维护，包括体检、疫苗、绝育、治疗、异常记录和附件
+- 认养申请提交、申请评分、初审、终审、作废和取消
+- 协议生成、协议编辑、交接完成、协议取消和逻辑删除
+- 7/30/90 天回访任务生成、认养人反馈、后台补录、异常回访
+- 逾期回访刷新、异常预警生成、预警处理
+- 系统消息通知、操作日志、后台 Dashboard、全局搜索、CSV 导出
+- 后台公告管理，包括草稿、发布、下架、删除、图片上传和角色范围
+
+当前不作为正式业务演示的功能：
+
+- 文创商城和商品订单
+- 猫咪图像识别
+- 社区评论和收藏
 
 ## 角色权限
 
@@ -91,10 +199,10 @@ http://localhost:8080/#/
 ```properties
 MYSQL_URL=jdbc:mysql://localhost:3306/cat_adoption_system?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true&useSSL=false
 MYSQL_USERNAME=root
-MYSQL_PASSWORD=123456
+MYSQL_PASSWORD=root
 ```
 
-如果你的 MySQL root 密码不是 `123456`，用 PowerShell 这样启动：
+如果你的 MySQL root 密码不是 `root`，用 PowerShell 这样启动：
 
 ```powershell
 $env:MYSQL_USERNAME="root"
@@ -325,4 +433,3 @@ uvicorn app:app --host 0.0.0.0 --port 9000
 1. 先展示前台门户、公告和可认养猫咪。
 2. 再按普通用户、志愿者、医院用户、管理员四类角色跑主流程。
 3. 最后展示 Dashboard、全局搜索、CSV 导出、操作日志和 `MIDTERM_FEATURES.md`。
-

@@ -39,7 +39,6 @@ public class CatAdoptionService {
     private final FollowupTaskMapper followupTaskMapper;
     private final WarningRecordMapper warningRecordMapper;
     private final SystemMessageMapper systemMessageMapper;
-    private final DictItemMapper dictItemMapper;
     private final DashboardMapper dashboardMapper;
     private final NoticeMapper noticeMapper;
     private final AuditLogMapper auditLogMapper;
@@ -66,7 +65,6 @@ public class CatAdoptionService {
                               FollowupTaskMapper followupTaskMapper,
                               WarningRecordMapper warningRecordMapper,
                               SystemMessageMapper systemMessageMapper,
-                              DictItemMapper dictItemMapper,
                               DashboardMapper dashboardMapper,
                               NoticeMapper noticeMapper,
                               AuditLogMapper auditLogMapper,
@@ -92,7 +90,6 @@ public class CatAdoptionService {
         this.followupTaskMapper = followupTaskMapper;
         this.warningRecordMapper = warningRecordMapper;
         this.systemMessageMapper = systemMessageMapper;
-        this.dictItemMapper = dictItemMapper;
         this.dashboardMapper = dashboardMapper;
         this.noticeMapper = noticeMapper;
         this.auditLogMapper = auditLogMapper;
@@ -690,6 +687,7 @@ public class CatAdoptionService {
 
     @Transactional
     public ApplicationReviewDetail submitAdoptionApplication(AdoptionApplicationRequest request) {
+        // 认养申请入口：校验申请人身份、猫咪状态和重复申请后，写入申请主表并同步评分原因。
         validateAdoptionApplicationRequest(request);
         User user = currentUser();
         if (user.role() != Role.STUDENT) {
@@ -749,6 +747,7 @@ public class CatAdoptionService {
 
     public List<ApplicationReviewDetail> listAdminAdoptionApplications(ApplicationStatus status, String riskLevel,
                                                                       String keyword, Integer page, Integer size) {
+        // 后台列表统一做分页兜底；志愿者默认只看待初审任务，管理员可按状态筛选全量申请。
         int safeSize = size == null || size <= 0 || size > 100 ? 50 : size;
         int safePage = page == null || page <= 0 ? 1 : page;
         ApplicationStatus effectiveStatus = status;
@@ -767,6 +766,7 @@ public class CatAdoptionService {
 
     @Transactional
     public ApplicationReviewDetail initialAudit(String applicationId, ApplicationAuditRequest request) {
+        // 初审只允许志愿者处理，通过后进入终审，驳回则停留在初审驳回状态。
         if (AuthContext.role() != Role.VOLUNTEER) {
             throw new BusinessException("只有志愿者可以进行初审");
         }
@@ -781,6 +781,7 @@ public class CatAdoptionService {
 
     @Transactional
     public ApplicationReviewDetail finalAudit(String applicationId, ApplicationAuditRequest request) {
+        // 终审只允许管理员处理；终审通过后联动猫咪状态，避免继续被其他用户申请。
         if (AuthContext.role() != Role.ADMIN) {
             throw new BusinessException("只有管理员可以进行终审");
         }
@@ -901,6 +902,21 @@ public class CatAdoptionService {
     }
 
     @Transactional
+    public void deleteAgreement(Long id, ActionReasonRequest request) {
+        if (AuthContext.role() != Role.ADMIN) {
+            throw new BusinessException("只有管理员可以删除协议");
+        }
+        String reason = DataQualityValidator.requireCleanText("删除原因", request.reason(), 2, 300);
+        AgreementInfo agreement = getAgreement(id);
+        User operator = currentUser();
+        int deleted = agreementMapper.deleteAgreement(id, reason, operator.userId(), LocalDateTime.now());
+        if (deleted == 0) {
+            throw new BusinessException("当前协议状态不能删除");
+        }
+        logOperation(operator, "删除认养协议", "AGREEMENT", String.valueOf(id), agreement.status(), "DELETED", reason);
+    }
+
+    @Transactional
     public AgreementInfo completeHandover(Long id, AgreementHandoverRequest request) {
         if (AuthContext.role() != Role.ADMIN) {
             throw new BusinessException("Only admins can complete handover");
@@ -978,6 +994,7 @@ public class CatAdoptionService {
     }
 
     private FollowupTaskInfo submitFollowupRecordInternal(Long id, FollowupRecordSubmitRequest request, boolean staffRecord) {
+        // 回访记录共用流程：认养人自填和后台补录都写入记录表，再根据异常标记推进任务状态。
         if (request.abnormalFlag() && isBlank(request.abnormalDesc())) {
             throw new BusinessException("Abnormal description is required");
         }
@@ -999,6 +1016,7 @@ public class CatAdoptionService {
         followupTaskMapper.updateTaskStatus(id, nextStatus, now.toLocalDate(), request.abnormalFlag(),
                 staffRecord ? operator.userId() : task.handlerId(), operator.userId(), now);
         if (request.abnormalFlag()) {
+            // 异常回访会立即生成预警，方便管理员在预警中心持续跟踪。
             createFollowupWarning(task, "FOLLOWUP_ABNORMAL", "HIGH", request.abnormalDesc(), operator);
             sendMessage(task.adopterId(), "异常回访已记录", sourceLabel + "已记录异常情况，志愿者或管理员将继续跟进。", "FOLLOWUP", String.valueOf(id), operator);
             if (staffRecord && operator.role() == Role.VOLUNTEER) {
@@ -1037,6 +1055,7 @@ public class CatAdoptionService {
     }
 
     public List<FollowupTaskInfo> listAdminFollowupTasks(FollowupTaskStatus status, LocalDate planDate, String keyword) {
+        // 后台查看任务前先刷新逾期状态，保证列表展示的是实时待办。
         refreshOverdueTasksInternal(null);
         return followupTaskMapper.findTasks(null, null, status, planDate, blankToNull(keyword));
     }
@@ -1109,6 +1128,7 @@ public class CatAdoptionService {
 
     @Transactional
     public WarningInfo handleWarning(Long id, WarningHandleRequest request) {
+        // 预警处理保留处理意见和处理人，处理完成后可能联动猫咪进入已认养状态。
         if (AuthContext.role() != Role.ADMIN) {
             throw new BusinessException("Only admins can handle warnings");
         }
@@ -1130,6 +1150,20 @@ public class CatAdoptionService {
             maybeMarkCatAdopted(warning.catId(), operator);
         }
         return getWarning(id);
+    }
+
+    @Transactional
+    public void deleteWarning(Long id) {
+        if (AuthContext.role() != Role.ADMIN) {
+            throw new BusinessException("Only admins can delete warnings");
+        }
+        WarningInfo warning = getWarning(id);
+        User operator = currentUser();
+        int deleted = warningRecordMapper.deleteWarning(id, operator.userId(), LocalDateTime.now());
+        if (deleted == 0) {
+            throw new BusinessException("Warning delete failed");
+        }
+        logOperation(operator, "Delete warning", "WARNING", String.valueOf(id), warning.status(), "DELETED", warning.warningType());
     }
 
     @Transactional
@@ -1249,6 +1283,7 @@ public class CatAdoptionService {
         Notice notice = new Notice(codeGenerator.next("NT"), request.title(), request.content(), request.publisher(),
                 request.pinned(), request.enabled(), LocalDateTime.now(), null, defaultNoticeTargetRoles());
         noticeMapper.insert(notice);
+        replaceNoticeTargetRoles(notice.noticeId(), notice.targetRoles());
         log(request.publisher(), "发布公告", "NOTICE", notice.noticeId(), notice.title());
         return notice;
     }
@@ -1271,6 +1306,7 @@ public class CatAdoptionService {
         Notice updated = new Notice(noticeId, request.title(), request.content(), request.publisher(),
                 request.pinned(), request.enabled(), old.publishedAt(), old.imageUrl(), old.targetRoles());
         noticeMapper.update(updated);
+        replaceNoticeTargetRoles(noticeId, updated.targetRoles());
         log(request.publisher(), "更新公告", "NOTICE", noticeId, request.title());
         return getNotice(noticeId);
     }
@@ -1510,35 +1546,6 @@ public class CatAdoptionService {
         return communityMapper.findPostById(postId);
     }
 
-    public List<Comment> listComments(String sourceType, Integer sourceId) {
-        return communityMapper.findComments(sourceType, sourceId);
-    }
-
-    @Transactional
-    public Comment createComment(CommentRequest request) {
-        User user = findUser(AuthContext.userId());
-        Comment comment = new Comment(null, user.userId(), user.userName(), request.sourceType(), request.sourceId(),
-                request.replyToId(), request.content(), LocalDateTime.now());
-        communityMapper.insertComment(comment);
-        log(user.userName(), "发表评论", "COMMENT", request.sourceType(), String.valueOf(request.sourceId()));
-        return comment;
-    }
-
-    @Transactional
-    public boolean toggleCollect(String sourceType, Integer sourceId, String title, String imageUrl) {
-        String userId = AuthContext.userId();
-        if (communityMapper.countCollect(userId, sourceType, sourceId) > 0) {
-            communityMapper.deleteCollect(userId, sourceType, sourceId);
-            return false;
-        }
-        communityMapper.insertCollect(new GenericCollect(userId, sourceType, sourceId, title, imageUrl, LocalDateTime.now()));
-        return true;
-    }
-
-    public List<GenericCollect> listCollects() {
-        return communityMapper.findCollects(AuthContext.userId());
-    }
-
     public DashboardStats dashboard() {
         long catCount = catMapper.countAll();
         long applicationCount = applicationMapper.countAll();
@@ -1618,6 +1625,7 @@ public class CatAdoptionService {
 
     @Transactional
     public Notice createAdminNotice(NoticeAdminRequest request) {
+        // 公告采用三范式设计：公告正文写入 t_notice，可见角色单独写入 notice_target_role。
         User operator = currentUser();
         String targetRoles = normalizeNoticeTargetRoles(request.targetRoles());
         Notice notice = new Notice(codeGenerator.next("NT"), request.title(), request.content(), operator.userName(),
@@ -1628,6 +1636,7 @@ public class CatAdoptionService {
         noticeMapper.updateAdminFields(notice.noticeId(), valueOrDefault(request.noticeType(), "SYSTEM"),
                 valueOrDefault(request.publishStatus(), "DRAFT"), operator.userId(), request.sortOrder(),
                 blankToNull(request.imageUrl()), targetRoles, LocalDateTime.now());
+        replaceNoticeTargetRoles(notice.noticeId(), targetRoles);
         logOperation(operator, "Create notice", "NOTICE", notice.noticeId(), null, request.publishStatus(), request.title());
         if (Boolean.TRUE.equals(request.sendMessage())) {
             broadcastMessageToRoles(targetRoles, "公告发布：" + request.title(), request.content(), "NOTICE", notice.noticeId(), operator);
@@ -1637,6 +1646,7 @@ public class CatAdoptionService {
 
     @Transactional
     public Notice updateAdminNotice(String noticeId, NoticeAdminRequest request) {
+        // 编辑公告时同时重建角色关联表，保证前端仍按原 targetRoles 字符串回显。
         Notice old = getNotice(noticeId);
         User operator = currentUser();
         String targetRoles = normalizeNoticeTargetRoles(request.targetRoles());
@@ -1646,6 +1656,7 @@ public class CatAdoptionService {
         noticeMapper.updateAdminFields(noticeId, valueOrDefault(request.noticeType(), "SYSTEM"),
                 valueOrDefault(request.publishStatus(), old.enabled() ? "PUBLISHED" : "DRAFT"), operator.userId(),
                 request.sortOrder(), blankToNull(request.imageUrl()), targetRoles, LocalDateTime.now());
+        replaceNoticeTargetRoles(noticeId, targetRoles);
         logOperation(operator, "Update notice", "NOTICE", noticeId, old.title(), request.title(), request.noticeType());
         if (Boolean.TRUE.equals(request.sendMessage()) && "PUBLISHED".equals(valueOrDefault(request.publishStatus(), "DRAFT"))) {
             broadcastMessageToRoles(targetRoles, "公告更新：" + request.title(), request.content(), "NOTICE", noticeId, operator);
@@ -1675,41 +1686,6 @@ public class CatAdoptionService {
         User operator = currentUser();
         noticeMapper.logicalDelete(noticeId, LocalDateTime.now());
         logOperation(operator, "Delete notice", "NOTICE", noticeId, null, "DELETED", noticeId);
-    }
-
-    public List<DictItemInfo> listDictItems(String dictType, boolean enabledOnly) {
-        return dictItemMapper.findAll(blankToNull(dictType), enabledOnly);
-    }
-
-    @Transactional
-    public void createDictItem(DictItemRequest request) {
-        User operator = currentUser();
-        dictItemMapper.insert(request.dictType(), request.dictLabel(), request.dictValue(),
-                request.sortOrder() == null ? 0 : request.sortOrder(), request.enabled() == null || request.enabled(),
-                request.remark(), operator.userId(), LocalDateTime.now());
-        logOperation(operator, "Create dict item", "DICT", request.dictType(), null, request.dictValue(), request.dictLabel());
-    }
-
-    @Transactional
-    public void updateDictItem(Long id, DictItemRequest request) {
-        User operator = currentUser();
-        dictItemMapper.update(id, request.dictLabel(), request.dictValue(), request.sortOrder() == null ? 0 : request.sortOrder(),
-                request.enabled() == null || request.enabled(), request.remark(), operator.userId(), LocalDateTime.now());
-        logOperation(operator, "Update dict item", "DICT", String.valueOf(id), null, request.dictValue(), request.dictLabel());
-    }
-
-    @Transactional
-    public void updateDictEnabled(Long id, boolean enabled) {
-        User operator = currentUser();
-        dictItemMapper.updateEnabled(id, enabled, operator.userId(), LocalDateTime.now());
-        logOperation(operator, "Toggle dict item", "DICT", String.valueOf(id), null, String.valueOf(enabled), "");
-    }
-
-    @Transactional
-    public void deleteDictItem(Long id) {
-        User operator = currentUser();
-        dictItemMapper.delete(id, operator.userId(), LocalDateTime.now());
-        logOperation(operator, "Delete dict item", "DICT", String.valueOf(id), null, "DELETED", "");
     }
 
     public List<OperationLogInfo> listOperationLogs(String operatorKeyword, String operationType, String bizType,
@@ -1990,6 +1966,7 @@ public class CatAdoptionService {
     }
 
     private void broadcastMessageToRoles(String roles, String title, String content, String bizType, String bizId, User operator) {
+        // 将公告或业务提醒广播给多个角色，避免前端逐个用户发送造成重复逻辑。
         Set<Role> targetRoles = parseNoticeTargetRoles(roles);
         if (targetRoles.isEmpty()) {
             broadcastMessage(title, content, bizType, bizId, operator);
@@ -2063,6 +2040,7 @@ public class CatAdoptionService {
     }
 
     private FollowupRefreshResult refreshOverdueTasksInternal(User operator) {
+        // 逾期刷新按计划日期批量扫描，既更新任务状态，也为逾期任务生成预警记录。
         List<Long> overdueIds = followupTaskMapper.findPendingOverdueIds(LocalDate.now());
         int updated = 0;
         int warnings = 0;
@@ -2089,6 +2067,7 @@ public class CatAdoptionService {
 
     private boolean createFollowupWarning(FollowupTaskInfo task, String warningType, String warningLevel,
                                           String description, User operator) {
+        // 同一个回访任务只保留一条待处理预警，防止反复提交导致预警重复堆积。
         if (warningRecordMapper.countOpenByTaskAndType(task.id(), warningType) > 0) {
             return false;
         }
@@ -2428,6 +2407,20 @@ public class CatAdoptionService {
                 || normalized.toLowerCase().startsWith("codex");
     }
 
+    private void replaceNoticeTargetRoles(String noticeId, String targetRoles) {
+        // 物理表已拆分为公告主表和角色关联表，这里负责把前端逗号字符串落到关联表。
+        noticeMapper.deleteTargetRoles(noticeId);
+        if (isBlank(targetRoles)) {
+            return;
+        }
+        for (String role : targetRoles.split(",")) {
+            String cleaned = role.trim();
+            if (!cleaned.isEmpty()) {
+                noticeMapper.insertTargetRole(noticeId, cleaned);
+            }
+        }
+    }
+
     private void validateCatStatusTransition(Cat cat, CatStatus targetStatus) {
         if (cat.status() == targetStatus) {
             return;
@@ -2501,6 +2494,7 @@ public class CatAdoptionService {
     }
 
     private ApplicationScore scoreApplication(AdoptionApplicationRequest request) {
+        // 申请评分用于辅助初审：根据居住、经验、回访承诺等字段计算风险等级和评分原因。
         int score = 0;
         List<String> reasons = new ArrayList<>();
         if (positive(request.petExperience())) {
@@ -2644,6 +2638,7 @@ public class CatAdoptionService {
 
     private void logOperation(User operator, String action, String targetType, String targetId,
                               String beforeData, String afterData, String remark) {
+        // 操作日志统一记录关键业务变更，便于后台审计和毕业设计演示流程追踪。
         LocalDateTime now = LocalDateTime.now();
         String operatorName = operator == null ? "系统" : operator.userName();
         String operatorId = operator == null ? null : operator.userId();

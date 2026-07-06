@@ -131,4 +131,15 @@ public interface WarningRecordMapper {
                            @Param("handleComment") String handleComment,
                            @Param("handlerId") String handlerId,
                            @Param("handledAt") LocalDateTime handledAt);
+
+    @Update("""
+            UPDATE warning_record
+            SET deleted = 1,
+                update_by = #{operatorId},
+                update_time = #{updatedAt}
+            WHERE id = #{id} AND COALESCE(deleted, 0) = 0
+            """)
+    int deleteWarning(@Param("id") Long id,
+                      @Param("operatorId") String operatorId,
+                      @Param("updatedAt") LocalDateTime updatedAt);
 }
