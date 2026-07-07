@@ -958,7 +958,7 @@
         { path: "#/admin/cats", label: "猫咪档案", roles: ["VOLUNTEER", "ADMIN"], title: "猫咪档案管理", text: "维护猫咪档案、照片、标签和生命周期状态。" },
         { path: "#/admin/medical", label: "医疗工作台", roles: ["HOSPITAL", "ADMIN"], title: "医疗记录管理", text: "医院用户录入体检、疫苗、绝育、治疗和异常记录。" },
         { path: "#/admin/adoption/audits", label: "申请审核", roles: ["VOLUNTEER", "ADMIN"], title: "认养申请审核", text: "志愿者初审，管理员终审，沉淀审核记录。" },
-        { path: "#/admin/agreements", label: "协议交接", roles: ["VOLUNTEER", "ADMIN"], title: "协议交接管理", text: "系统自动生成协议，管理员查看、编辑、作废、删除协议并登记交接。" },
+        { path: "#/admin/agreements", label: "协议交接", roles: ["VOLUNTEER", "ADMIN"], title: "协议交接管理", text: "系统自动生成协议，志愿者和管理员登记交接信息，管理员可编辑或取消未交接协议。" },
         { path: "#/admin/followups", label: "回访任务", roles: ["VOLUNTEER", "ADMIN"], title: "回访任务管理", text: "查看待回访、已完成、逾期和异常回访任务。" },
         { path: "#/admin/warnings", label: "异常预警", roles: ["VOLUNTEER", "ADMIN"], title: "异常预警中心", text: "处理回访逾期、回访异常、医疗异常和高风险申请。" },
         { path: "#/admin/users", label: "用户角色", roles: ["ADMIN"], title: "用户与角色管理", text: "管理员启停用户、分配角色并记录操作日志。" },
@@ -3445,8 +3445,9 @@ ${audits || "暂无"}`;
                         <td>${row.handoverTime ? `${escapeHtml(row.handoverLocation || "-")}<br><small>${escapeHtml(row.handoverTime.replace("T", " "))}</small>` : "待交接"}</td>
                         <td>
                             ${row.id ? `<button class="ghost-btn" data-agreement-detail="${row.id}">查看</button>` : ""}
-                            ${user.role === "ADMIN" && row.id && (row.status === "GENERATED" || row.status === "DRAFT") ? `<button class="ghost-btn" data-agreement-edit="${row.id}">编辑</button><button class="ghost-btn" data-agreement-cancel="${row.id}">作废</button><button class="ghost-btn" data-agreement-delete="${row.id}">删除</button><button class="primary-btn" data-agreement-handover="${row.id}">完成交接</button>` : ""}
-                            ${user.role === "ADMIN" && row.id && row.status === "CANCELLED" ? `<button class="ghost-btn" data-agreement-delete="${row.id}">删除</button>` : ""}
+                            ${user.role === "ADMIN" && row.id && (row.status === "GENERATED" || row.status === "DRAFT") ? `<button class="ghost-btn" data-agreement-edit="${row.id}">编辑</button>` : ""}
+                            ${row.id && row.status === "GENERATED" ? `<button class="primary-btn" data-agreement-handover="${row.id}">完成交接</button>` : ""}
+                            ${row.id && row.status === "GENERATED" ? `<button class="ghost-btn" data-agreement-cancel="${row.id}">取消交接</button>` : ""}
                         </td>
                     </tr>`).join("") || `<tr><td colspan="8"><div class="mis-empty">暂无待交接记录</div></td></tr>`}
                 </tbody></table></div>
@@ -3472,8 +3473,8 @@ ${audits || "暂无"}`;
                 renderAdminAgreements(route, user);
             }));
             shell.querySelectorAll("[data-agreement-cancel]").forEach(button => button.addEventListener("click", async () => {
-                if (!confirm("确认作废该未交接协议？")) return;
-                const reason = prompt("请输入作废原因");
+                if (!confirm("确认取消该未交接协议？")) return;
+                const reason = prompt("请输入取消原因");
                 if (!reason) return;
                 try {
                     await api(`/api/admin/agreements/${button.dataset.agreementCancel}/cancel`, {
@@ -3486,8 +3487,8 @@ ${audits || "暂无"}`;
                 }
             }));
             shell.querySelectorAll("[data-agreement-delete]").forEach(button => button.addEventListener("click", async () => {
-                if (!confirm("确认删除该未交接协议？删除后不再显示在协议列表中。")) return;
-                const reason = prompt("请输入删除原因");
+                if (!confirm("确认取消该未交接协议？取消后系统会重新生成待交接协议。")) return;
+                const reason = prompt("请输入取消交接原因");
                 if (!reason) return;
                 try {
                     await api(`/api/admin/agreements/${button.dataset.agreementDelete}`, {
@@ -3500,19 +3501,21 @@ ${audits || "暂无"}`;
                 }
             }));
             shell.querySelectorAll("[data-agreement-handover]").forEach(button => button.addEventListener("click", async () => {
-                const handoverTime = prompt("交接时间，格式：2026-06-26T17:00:00", new Date().toISOString().slice(0, 19));
-                if (!handoverTime) return;
                 const handoverLocation = prompt("交接地点", "翡翠湖校区志愿者服务点");
                 if (!handoverLocation) return;
-                const handoverUserId = prompt("交接人用户ID", user.userId);
-                if (!handoverUserId) return;
                 const remark = prompt("备注", "现场确认完成交接") || "";
-                await api(`/api/admin/agreements/${button.dataset.agreementHandover}/handover`, {
-                    method: "PUT",
-                    body: JSON.stringify({ handoverTime, handoverLocation, handoverUserId, remark, adopterConfirmed: true, volunteerConfirmed: true })
-                });
-                alert("交接完成，已自动生成 7/30/90 天回访任务。");
-                window.location.hash = "#/admin/followups";
+                button.disabled = true;
+                try {
+                    await api(`/api/admin/agreements/${button.dataset.agreementHandover}/handover`, {
+                        method: "PUT",
+                        body: JSON.stringify({ handoverLocation, handoverUserId: user.userId, remark, adopterConfirmed: true, volunteerConfirmed: true })
+                    });
+                    alert("交接完成，已自动生成 7/30/90 天回访任务。");
+                    renderAdminAgreements(route, user);
+                } catch (error) {
+                    alert(error.message || "交接失败，请稍后重试。");
+                    button.disabled = false;
+                }
             }));
         } catch (error) {
             panel.innerHTML = `<div class="mis-error">${escapeHtml(error.message)}</div>`;

@@ -74,13 +74,12 @@ public class AdminAgreementController {
     }
 
     /**
-     * 完成协议交接（管理员权限）
-     * 认养申请通过终审后，管理员执行交接操作，完成猫咪交付
+     * 完成协议交接（志愿者或管理员权限）
+     * 认养申请通过终审后，志愿者或管理员登记交接信息，完成猫咪交付
      * @param id 协议ID
-     * @param request 交接请求（包含交接时间、地点等信息）
+     * @param request 交接请求（包含交接地点、备注等信息）
      */
     @PutMapping("/{id}/handover")
-    @RequireRole(Role.ADMIN)
     public ApiResponse<AgreementInfo> handover(@PathVariable Long id,
                                                @Valid @RequestBody AgreementHandoverRequest request) {
         return ApiResponse.ok(service.completeHandover(id, request));
@@ -93,7 +92,6 @@ public class AdminAgreementController {
      * @param request 操作请求（包含取消原因）
      */
     @PutMapping("/{id}/cancel")
-    @RequireRole(Role.ADMIN)
     public ApiResponse<AgreementInfo> cancel(@PathVariable Long id,
                                              @Valid @RequestBody ActionReasonRequest request) {
         return ApiResponse.ok(service.cancelAgreement(id, request));

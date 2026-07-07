@@ -1,7 +1,6 @@
 package com.hfut.cat_adoption_system.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 
 import java.time.LocalDateTime;
 
@@ -11,8 +10,8 @@ import java.time.LocalDateTime;
  * 用于记录认养协议的线下交接信息，完成猫咪的实际交付
  */
 public record AgreementHandoverRequest(
-                /** 交接时间，必填字段 */
-                @NotNull LocalDateTime handoverTime,
+                /** 交接时间，不传时后端自动使用当前时间 */
+                LocalDateTime handoverTime,
                 /** 交接地点，必填字段 */
                 @NotBlank String handoverLocation,
                 /** 执行交接的志愿者ID，必填字段 */

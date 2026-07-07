@@ -253,7 +253,7 @@ public interface CatMapper {
                         LEFT JOIN t_medical_record m ON m.medical_id = (
                             SELECT mr.medical_id FROM t_medical_record mr
                             WHERE mr.cat_id = c.cat_id AND COALESCE(mr.deleted, 0) = 0
-                            ORDER BY mr.check_date ESC, mr.created_at DESC, mr.medical_id DESC
+                            ORDER BY mr.check_date DESC, mr.created_at DESC, mr.medical_id DESC
                             LIMIT 1
                         )
                         WHERE c.cat_id = #{catId}

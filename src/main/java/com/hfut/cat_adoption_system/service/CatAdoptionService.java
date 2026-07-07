@@ -814,6 +814,7 @@ public class CatAdoptionService {
             catMapper.updateStatus(row.catId(), CatStatus.APPLYING, LocalDateTime.now());
             logOperation(currentUser(), "终审通过联动猫咪申请中", "CAT", row.catId(), CatStatus.ADOPTABLE.name(),
                     CatStatus.APPLYING.name(), applicationId);
+            createAgreementIfAbsent(row, currentUser());
         }
         return detail;
     }
@@ -842,7 +843,13 @@ public class CatAdoptionService {
         return getApplicationReviewDetail(applicationId, true);
     }
 
+    @Transactional
     public List<AgreementInfo> listPendingAgreements(String status, String keyword) {
+        for (AgreementInfo row : agreementMapper.findPending("NOT_GENERATED", null)) {
+            if (row.id() == null && "PENDING_HANDOVER".equals(row.applicationStatus())) {
+                createAgreementIfAbsent(requireApplicationRow(row.applicationId()), currentUser());
+            }
+        }
         return agreementMapper.findPending(blankToNull(status), blankToNull(keyword));
     }
 
@@ -869,6 +876,22 @@ public class CatAdoptionService {
                 "GENERATED", agreementNo);
         sendMessage(row.userId(), "认养协议已生成", "你的认养协议已生成，请等待交接安排。", "AGREEMENT", agreementNo, operator);
         return agreementMapper.findByApplicationId(applicationId);
+    }
+
+    private AgreementInfo createAgreementIfAbsent(ApplicationReviewRow row, User operator) {
+        AgreementInfo existing = agreementMapper.findByApplicationId(row.applicationId());
+        if (existing != null) {
+            return existing;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        String agreementNo = nextAgreementNo();
+        String content = buildAgreementContent(row, agreementNo, now);
+        agreementMapper.insertGenerated(agreementNo, row.applicationId(), row.catId(), row.userId(),
+                content, "Generated from final-approved adoption application", operator.userId(), now);
+        logOperation(operator, "Generate adoption agreement", "AGREEMENT", row.applicationId(), null,
+                "GENERATED", agreementNo);
+        sendMessage(row.userId(), "认养协议已生成", "你的认养协议已生成，请等待交接安排。", "AGREEMENT", agreementNo, operator);
+        return agreementMapper.findByApplicationId(row.applicationId());
     }
 
     public AgreementInfo getAgreement(Long id) {
@@ -901,7 +924,7 @@ public class CatAdoptionService {
 
     @Transactional
     public AgreementInfo cancelAgreement(Long id, ActionReasonRequest request) {
-        if (AuthContext.role() != Role.ADMIN) {
+        if (AuthContext.role() != Role.ADMIN && AuthContext.role() != Role.VOLUNTEER) {
             throw new BusinessException("只有管理员可以取消协议");
         }
         String reason = DataQualityValidator.requireCleanText("取消原因", request.reason(), 2, 300);
@@ -936,8 +959,8 @@ public class CatAdoptionService {
 
     @Transactional
     public AgreementInfo completeHandover(Long id, AgreementHandoverRequest request) {
-        if (AuthContext.role() != Role.ADMIN) {
-            throw new BusinessException("Only admins can complete handover");
+        if (AuthContext.role() != Role.ADMIN && AuthContext.role() != Role.VOLUNTEER) {
+            throw new BusinessException("Only volunteers or admins can complete handover");
         }
         AgreementInfo agreement = getAgreement(id);
         if (!"GENERATED".equals(agreement.status())) {
@@ -947,23 +970,22 @@ public class CatAdoptionService {
         if (row.status() != ApplicationStatus.PENDING_HANDOVER) {
             throw new BusinessException("Application is not PENDING_HANDOVER");
         }
-        if (isBlank(request.handoverLocation()) || isBlank(request.handoverUserId()) || request.handoverTime() == null) {
-            throw new BusinessException("Handover time, location and handover user are required");
-        }
-        findUser(request.handoverUserId());
-        if (followupTaskMapper.countByApplicationId(row.applicationId()) > 0) {
-            throw new BusinessException("Follow-up tasks already exist for this application");
+        if (isBlank(request.handoverLocation())) {
+            throw new BusinessException("Handover location is required");
         }
         User operator = currentUser();
+        String handoverUserId = isBlank(request.handoverUserId()) ? operator.userId() : request.handoverUserId();
+        LocalDateTime handoverTime = request.handoverTime() == null ? LocalDateTime.now() : request.handoverTime();
+        findUser(handoverUserId);
         LocalDateTime now = LocalDateTime.now();
-        int agreementUpdated = agreementMapper.markHandedOver(id, request.handoverTime(), request.handoverLocation(),
-                request.handoverUserId(), request.adopterConfirmed(), request.volunteerConfirmed(),
+        int agreementUpdated = agreementMapper.markHandedOver(id, handoverTime, request.handoverLocation(),
+                handoverUserId, request.adopterConfirmed(), request.volunteerConfirmed(),
                 request.remark(), operator.userId(), now);
         if (agreementUpdated == 0) {
             throw new BusinessException("Agreement is not in a handover-ready status");
         }
         int applicationUpdated = applicationMapper.markMisHandedOver(row.applicationId(),
-                "Adoption handover completed", operator.userId(), request.handoverTime());
+                "Adoption handover completed", operator.userId(), handoverTime);
         if (applicationUpdated == 0) {
             throw new BusinessException("Application handover status update failed");
         }
@@ -975,7 +997,7 @@ public class CatAdoptionService {
         }
         int cancelled = applicationMapper.cancelOtherMisActive(row.catId(), row.applicationId(),
                 "Cat adoption handover has been completed", operator.userId(), now);
-        createFollowupTasks(row, id, request.handoverTime().toLocalDate(), operator, now);
+        createFollowupTasks(row, id, handoverTime.toLocalDate(), operator, now);
         logOperation(operator, "Complete adoption handover", "AGREEMENT", String.valueOf(id),
                 "GENERATED", "HANDED_OVER", "cancelledOtherApplications=" + cancelled);
         logOperation(operator, "Adoption application handed over", "APPLICATION", row.applicationId(),
@@ -1877,13 +1899,19 @@ public class CatAdoptionService {
     private void createFollowupTasks(ApplicationReviewRow row, Long agreementId, LocalDate handoverDate,
                                      User operator, LocalDateTime now) {
         int created = 0;
-        created += followupTaskMapper.insertTask(row.applicationId(), agreementId, row.catId(), row.userId(),
-                handoverDate.plusDays(7), FollowupTaskType.DAY_7, FollowupTaskStatus.PENDING, operator.userId(), now);
-        created += followupTaskMapper.insertTask(row.applicationId(), agreementId, row.catId(), row.userId(),
-                handoverDate.plusDays(30), FollowupTaskType.DAY_30, FollowupTaskStatus.PENDING, operator.userId(), now);
-        created += followupTaskMapper.insertTask(row.applicationId(), agreementId, row.catId(), row.userId(),
-                handoverDate.plusDays(90), FollowupTaskType.DAY_90, FollowupTaskStatus.PENDING, operator.userId(), now);
-        if (created != 3) {
+        if (followupTaskMapper.countByApplicationIdAndType(row.applicationId(), FollowupTaskType.DAY_7) == 0) {
+            created += followupTaskMapper.insertTask(row.applicationId(), agreementId, row.catId(), row.userId(),
+                    handoverDate.plusDays(7), FollowupTaskType.DAY_7, FollowupTaskStatus.PENDING, operator.userId(), now);
+        }
+        if (followupTaskMapper.countByApplicationIdAndType(row.applicationId(), FollowupTaskType.DAY_30) == 0) {
+            created += followupTaskMapper.insertTask(row.applicationId(), agreementId, row.catId(), row.userId(),
+                    handoverDate.plusDays(30), FollowupTaskType.DAY_30, FollowupTaskStatus.PENDING, operator.userId(), now);
+        }
+        if (followupTaskMapper.countByApplicationIdAndType(row.applicationId(), FollowupTaskType.DAY_90) == 0) {
+            created += followupTaskMapper.insertTask(row.applicationId(), agreementId, row.catId(), row.userId(),
+                    handoverDate.plusDays(90), FollowupTaskType.DAY_90, FollowupTaskStatus.PENDING, operator.userId(), now);
+        }
+        if (followupTaskMapper.countByApplicationId(row.applicationId()) < 3) {
             throw new BusinessException("Failed to create 7/30/90 day follow-up tasks");
         }
         logOperation(operator, "Create follow-up tasks", "FOLLOWUP_TASK", row.applicationId(),

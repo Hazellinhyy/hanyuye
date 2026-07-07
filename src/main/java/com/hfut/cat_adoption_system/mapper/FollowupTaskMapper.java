@@ -62,6 +62,15 @@ public interface FollowupTaskMapper {
         @Select("SELECT COUNT(*) FROM followup_task WHERE application_id = #{applicationId} AND COALESCE(deleted, 0) = 0")
         int countByApplicationId(String applicationId);
 
+        @Select("""
+                        SELECT COUNT(*) FROM followup_task
+                        WHERE application_id = #{applicationId}
+                          AND task_type = #{taskType}
+                          AND COALESCE(deleted, 0) = 0
+                        """)
+        int countByApplicationIdAndType(@Param("applicationId") String applicationId,
+                        @Param("taskType") FollowupTaskType taskType);
+
         /**
          * 统计所有活跃回访任务数量
          * 
