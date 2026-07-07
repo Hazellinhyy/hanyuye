@@ -1,4 +1,5 @@
 (function () {
+    // 前端主入口：所有页面都渲染到 mis-shell，形成不依赖构建工具的单页应用。
     const shell = document.getElementById("mis-shell");
     if (!shell) {
         return;
@@ -18,6 +19,7 @@
     const nativeConfirm = window.confirm.bind(window);
     const nativePrompt = window.prompt.bind(window);
 
+    // 多语言词典只负责演示界面文案翻译，业务数据中的编号和用户输入不会被翻译。
     const i18nPacks = {
         en: {
             "后台管理系统": "Admin System",
@@ -932,6 +934,7 @@
         IGNORED: { label: "已忽略", tone: "info" }
     };
 
+    // 前台路由配置：定义导航名称、页面标题和是否需要特定角色。
     const userRoutes = [
         { path: "#/", label: "门户首页", title: "合肥工业大学校园流浪猫在线认养系统", text: "校园公益认养与流浪猫全生命周期管理平台。" },
         { path: "#/data-screen", label: "数据大屏", title: "实时数据大屏", text: "查看猫咪档案、认养进度、公告和健康管理实时概览。" },
@@ -948,6 +951,7 @@
         { path: "#/register", label: "注册", title: "注册", text: "创建普通用户账号，提交线索和认养申请。" }
     ];
 
+    // 后台路由配置：roles 字段用于和登录用户角色做权限匹配。
     const adminRoutes = [
         { path: "#/admin/dashboard", label: "Dashboard", roles: ["VOLUNTEER", "ADMIN"], title: "后台首页", text: "展示猫咪、线索、申请、回访、预警等 MIS 指标。" },
         { path: "#/admin/clues", label: "线索核实", roles: ["VOLUNTEER", "ADMIN"], title: "线索核实管理", text: "志愿者核实线索，管理员查看和追踪处理结果。" },
@@ -963,6 +967,7 @@
        
     ];
 
+    // 这些前台页面涉及个人数据或业务提交，未登录用户会被引导到登录页。
     const privateFrontRoutePaths = new Set([
         "#/clues/submit",
         "#/my/clues",
@@ -978,6 +983,7 @@
     let authChecked = false;
 
     function normalizeRole(role) {
+        // 后端历史数据中医院角色可能有不同写法，前端统一归一为 HOSPITAL 后再做权限判断。
         const value = String(role || "").trim().toUpperCase();
         if (["HOSPITAL", "HOSPITAL_USER", "MEDICAL", "DOCTOR", "PARTNER_HOSPITAL"].includes(value)
                 || role === "合作医院" || role === "医疗协作用户" || role === "医院用户") {
@@ -1005,6 +1011,7 @@
     }
 
     function translateText(value) {
+        // 翻译时先保护业务编号，避免 APP、CAT、NT 等编号被误替换。
         if (!value) return value;
         if (currentLocale === "zh") return String(value);
         const pack = { ...(i18nPacks[currentLocale] || {}), ...(i18nCommonPacks[currentLocale] || {}) };
@@ -1044,6 +1051,7 @@
     }
 
     function applyLocale(root = shell) {
+        // 对当前渲染出来的 DOM 做轻量翻译，跳过输入框正文和声明了 data-no-i18n 的区域。
         if (!root) return;
         const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
             acceptNode(node) {
@@ -1107,6 +1115,7 @@
     }
 
     async function verifyAuth() {
+        // 页面刷新后用本地 token 请求 /api/users/me，确认登录态仍然有效。
         const saved = readAuth();
         if (!saved || !saved.token) {
             clearAuth();
@@ -1415,6 +1424,7 @@
     }
 
     async function downloadCsv(path, filename) {
+        // CSV 导出需要读取响应头中的文件流，所以不用统一 api()，单独处理 Blob 下载。
         const headers = { Accept: "text/csv,application/octet-stream,*/*" };
         const authToken = token();
         if (authToken) {
@@ -1460,6 +1470,7 @@
     }
 
     function uploadFileWithProgress(path, file, onProgress) {
+        // 图片上传使用 XMLHttpRequest，是为了展示上传进度；fetch 无法稳定获得上传百分比。
         return new Promise((resolve, reject) => {
             const formData = new FormData();
             formData.append("file", file);
@@ -1505,6 +1516,7 @@
     }
 
     async function uploadNoticeImageFile(file, onProgress) {
+        // 公告图片优先走公告上传接口；旧环境没有该接口时回退到线索上传接口，保证演示可用。
         try {
             return await uploadFileWithProgress("/api/uploads/notices", file, onProgress);
         } catch (error) {
@@ -1516,6 +1528,7 @@
     }
 
     function bindAdminGlobalSearch() {
+        // 后台顶部全局搜索采用防抖请求，减少输入过程中对后端的频繁访问。
         const input = document.getElementById("admin-global-search");
         const panel = document.getElementById("admin-search-panel");
         if (!input || !panel || input.dataset.bound) {
@@ -1567,6 +1580,7 @@
     }
 
     function normalizeHash() {
+        // 兼容旧版 hash 写法，统一转成当前正式路由格式。
         const hash = window.location.hash || "#/";
         if (hash === "#auth" || hash === "#/auth") {
             window.location.hash = "#/login";
@@ -1584,6 +1598,7 @@
     }
 
     function findRoute(hash) {
+        // 动态详情页没有固定配置，需要按路径模式临时生成路由元信息。
         if (/^#\/cats\/[^/]+$/.test(hash)) {
             const catId = hash.split("/").pop();
             return { path: "#/cats/:id", label: "猫咪详情", title: `猫咪详情：${catId}`, text: "展示公开档案、医疗时间线、生命周期时间线和认养入口。" };
@@ -1604,6 +1619,7 @@
     }
 
     function canVisit(route, role) {
+        // 角色访问控制集中在这里处理，避免各页面重复判断权限。
         const normalizedRole = normalizeRole(role);
         if (normalizedRole !== "STUDENT" && [
             "#/clues/submit",
@@ -1710,6 +1726,7 @@
     };
 
     function openAdoptionReadingDialog(kind, onUnlocked) {
+        // 提交认养前要求用户阅读须知，用倒计时按钮强化“知情同意”的业务含义。
         const doc = adoptionReadingDocs[kind];
         if (!doc) {
             return;
@@ -2055,6 +2072,7 @@
     }
 
     function renderClueSubmit(route, user) {
+        // 线索上报页：普通用户提交地点、时间、照片和描述，后端生成待核实线索。
         userShell(route, user, `
             ${pageHero(route)}
             <form class="mis-form" id="clue-submit-form">
@@ -2161,6 +2179,7 @@
             preview.src = previewObjectUrl;
         });
         uploadButton.addEventListener("click", async () => {
+            // 线索照片必须先上传，表单最终只提交服务器返回的 photoUrl。
             const file = photoFileInput.files?.[0];
             if (!file) {
                 progressText.textContent = "请先选择照片";
@@ -2190,6 +2209,7 @@
         });
         document.getElementById("clue-submit-form").addEventListener("submit", async event => {
             event.preventDefault();
+            // 提交前做前端质量校验，减少明显无效地点、描述或未上传照片进入数据库。
             const form = new FormData(event.currentTarget);
             const message = document.getElementById("clue-submit-message");
             const body = Object.fromEntries(form.entries());
@@ -2343,6 +2363,7 @@
     }
 
     async function renderAdoptionApply(route, user) {
+        // 认养申请页：只有普通用户且猫咪处于可认养状态时，才允许填写申请表。
         const catId = window.location.hash.split("?")[0].split("/").pop();
         userShell(route, user, `${pageHero(route)}<section class="mis-table-panel"><div class="mis-loading">正在加载申请表...</div></section>`);
         const panel = shell.querySelector(".mis-table-panel");
@@ -2404,6 +2425,7 @@
             }));
             document.getElementById("adoption-apply-form").addEventListener("submit", async event => {
                 event.preventDefault();
+                // 申请表提交前校验照护条件、经济能力、回访知情和承诺条款。
                 const form = new FormData(event.currentTarget);
                 const body = Object.fromEntries(form.entries());
                 body.catId = catId;
@@ -2765,6 +2787,7 @@
     }
 
     async function saveAdminCat(cat) {
+        // 后台猫咪编辑使用 prompt 快速录入，适合演示环境中的档案补充和状态维护。
         const catName = prompt("猫咪昵称", cat?.catName || "待命名");
         if (catName === null) return;
         const foundPlace = prompt("发现地点", cat?.foundPlace || "校园待补充地点");
@@ -2932,6 +2955,7 @@
     }
 
     async function renderAdminMedical(route, user) {
+        // 医疗工作台：医院用户录入医疗记录，管理员也可查看和维护猫咪健康档案。
         adminShell(route, user, `${adminHero(route)}<section class="mis-table-panel"><div class="mis-loading">正在加载医疗工作台...</div></section>`);
         const panel = shell.querySelector(".mis-table-panel");
         try {
@@ -3045,6 +3069,7 @@
             `;
             const medicalAttachmentUpload = bindMedicalAttachmentUpload();
             document.getElementById("medical-cat-jump").addEventListener("click", () => {
+                // 切换猫咪时把猫咪编号写入 hash，刷新后仍能保持当前选择。
                 const status = document.getElementById("medical-status-filter").value;
                 window.location.hash = `#/admin/medical?status=${encodeURIComponent(status)}&catId=${encodeURIComponent(document.getElementById("medical-cat-select").value)}`;
             });
@@ -3205,6 +3230,7 @@
     }
 
     async function auditApplication(applicationId, stage) {
+        // 审核动作根据 stage 选择初审或终审接口，前端只提交结果和意见，状态流转由后端统一控制。
         const auditResult = prompt("审核结果：APPROVED / REJECTED", "APPROVED");
         if (!auditResult) return;
         const auditComment = prompt("审核意见");
@@ -3250,6 +3276,7 @@ ${audits || "暂无"}`;
     }
 
     async function loadAdminClues() {
+        // 线索管理页根据筛选条件读取救助线索，支持核实、标记无效和从有效线索建档。
         const panel = shell.querySelector(".mis-table-panel");
         const params = new URLSearchParams(location.hash.split("?")[1] || "");
         try {
@@ -3311,6 +3338,7 @@ ${audits || "暂无"}`;
     }
 
     function bindAdminClueEvents(clues) {
+        // 线索列表的按钮事件集中绑定，便于保持筛选、核实、删除和建档后的刷新逻辑一致。
         document.getElementById("admin-clue-search").addEventListener("click", () => {
             const query = new URLSearchParams();
             const status = document.getElementById("admin-clue-status").value;
@@ -3383,6 +3411,7 @@ ${audits || "暂无"}`;
     }
 
     async function renderAdminAgreements(route, user) {
+        // 协议管理页承接终审通过后的交接流程，管理员可编辑协议、作废协议并完成交接。
         adminShell(route, user, `${adminHero(route)}<section class="mis-table-panel"><div class="mis-loading">正在加载协议交接记录...</div></section>`);
         const panel = shell.querySelector(".mis-table-panel");
         try {
@@ -3604,6 +3633,7 @@ ${detail.agreementContent || "-"}`;
     }
 
     function bindFollowupTaskActions(route, user, admin) {
+        // 回访任务操作会区分用户端和后台端：认养人提交状态，后台可补录记录、刷新逾期和标记异常。
         document.getElementById("refresh-overdue")?.addEventListener("click", async () => {
             const result = await api("/api/admin/followup/tasks/refresh-overdue", { method: "POST" });
             alert(`已刷新逾期任务：${result.updatedTaskCount} 条，生成预警：${result.generatedWarningCount} 条`);
@@ -3981,6 +4011,7 @@ ${followupRecordsText(records, task)}`;
     }
 
     async function renderAdminWarnings(route, user) {
+        // 预警中心汇总高风险申请、回访逾期、健康异常等记录，管理员在这里跟踪处理结果。
         adminShell(route, user, `${adminHero(route)}<section class="mis-table-panel"><div class="mis-loading">正在加载异常预警...</div></section>`);
         const panel = shell.querySelector(".mis-table-panel");
         try {
@@ -4105,6 +4136,7 @@ ${followupRecordsText(records, task)}`;
     }
 
     async function renderAdminUsers(route, user) {
+        // 用户管理页用于维护系统账号、角色和启用状态，避免直接改库造成权限数据不一致。
         adminShell(route, user, `${adminHero(route)}<section class="mis-table-panel"><div class="mis-loading">正在加载用户...</div></section>`);
         const panel = shell.querySelector(".mis-table-panel");
         try {
@@ -4172,6 +4204,7 @@ ${followupRecordsText(records, task)}`;
     }
 
     async function saveAdminUser(route, user, item) {
+        // 新增或编辑用户前先做基础表单校验，保证手机号、账号和说明字段符合后端业务要求。
         const userName = prompt("姓名", item?.userName || "");
         if (!userName) return;
         const schoolNo = prompt("登录账号/学工号", item?.schoolNo || "");
@@ -5676,6 +5709,7 @@ ${followupRecordsText(records, task)}`;
     }
 
     function render() {
+        // 单页应用的总调度入口：先完成路由规范化和权限校验，再分发到具体页面渲染函数。
         const hash = normalizeHash();
         if (!hash) {
             window.location.hash = "#/";
