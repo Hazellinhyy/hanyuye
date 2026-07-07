@@ -236,6 +236,24 @@ public class CatAdoptionService {
     }
 
     @Transactional
+    public void resetPassword(ForgotPasswordRequest request) {
+        // 忘记密码流程不依赖登录态，必须同时校验账号、手机号和身份证号，避免只凭账号重置密码。
+        User user = userMapper.findByAccount(request.account());
+        if (user == null || !user.enabled()) {
+            throw new BusinessException("账号信息不匹配");
+        }
+        if (!valueOrDefault(user.phone(), "").equals(request.phone().trim())
+                || !valueOrDefault(user.idCard(), "").equalsIgnoreCase(request.idCard().trim())) {
+            throw new BusinessException("账号、手机号或身份证号不匹配");
+        }
+        if (request.newPassword() == null || request.newPassword().length() < 6) {
+            throw new BusinessException("新密码长度至少 6 位");
+        }
+        userMapper.updatePassword(user.userId(), passwordHasher.hash(request.newPassword()));
+        log(user.userName(), "找回密码", "USER", user.userId(), "用户通过身份信息校验后重置密码");
+    }
+
+    @Transactional
     public void logout() {
         String userId = AuthContext.userId();
         userMapper.incrementTokenVersion(userId);

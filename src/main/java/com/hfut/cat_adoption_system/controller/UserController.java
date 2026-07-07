@@ -4,6 +4,7 @@ import com.hfut.cat_adoption_system.auth.PublicApi;
 import com.hfut.cat_adoption_system.auth.RequireRole;
 import com.hfut.cat_adoption_system.common.ApiResponse;
 import com.hfut.cat_adoption_system.dto.ApplicationDetail;
+import com.hfut.cat_adoption_system.dto.ForgotPasswordRequest;
 import com.hfut.cat_adoption_system.dto.LoginRequest;
 import com.hfut.cat_adoption_system.dto.LoginResult;
 import com.hfut.cat_adoption_system.dto.PasswordUpdateRequest;
@@ -86,6 +87,19 @@ public class UserController {
     @PublicApi
     public ApiResponse<LoginResult> login(@Valid @RequestBody LoginRequest request) {
         return ApiResponse.ok(service.login(request));
+    }
+
+    /**
+     * 忘记密码（公开接口）
+     * 用户通过账号、手机号和身份证号校验身份后重置密码
+     *
+     * @param request 忘记密码请求
+     */
+    @PostMapping("/password/forgot")
+    @PublicApi
+    public ApiResponse<Boolean> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        service.resetPassword(request);
+        return ApiResponse.ok(true);
     }
 
     /**

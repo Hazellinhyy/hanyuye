@@ -4263,9 +4263,23 @@ ${followupRecordsText(records, task)}`;
                     <h2>账号登录</h2>
                     <label>用户名 / 学号 / 手机号<input name="account" autocomplete="username" required></label>
                     <label>密码<input name="password" type="password" autocomplete="current-password" required></label>
-                    <label class="check"><input name="remember" type="checkbox"> 记住登录</label>
+                    <div class="auth-inline-row">
+                        <label class="check"><input name="remember" type="checkbox"> 记住登录</label>
+                        <button class="link-btn" type="button" id="forgot-password-toggle">忘记密码？</button>
+                    </div>
                     <button class="primary-btn">登录</button>
                     <p id="login-message" class="form-message"></p>
+                    <div class="forgot-panel" id="forgot-password-panel" hidden>
+                        <div class="forgot-panel-head">
+                            <strong>找回密码</strong>
+                            <span>请输入注册信息完成身份校验</span>
+                        </div>
+                        <label>账号 / 学号 / 手机号<input name="resetAccount" autocomplete="username"></label>
+                        <label>注册手机号<input name="resetPhone" inputmode="tel"></label>
+                        <label>身份证号<input name="resetIdCard"></label>
+                        <label>新密码<input name="resetPassword" type="password" minlength="6" autocomplete="new-password"></label>
+                        <button class="ghost-btn" type="button" id="forgot-password-submit">重置密码</button>
+                    </div>
                     <p class="hint">演示账号：2024210008、2022210006、H2026002、A2026002，默认密码 123456。</p>
                     <div class="demo-account-row" aria-label="演示账号快捷填充">
                         <button class="ghost-btn" type="button" data-demo-account="2024210008">普通用户</button>
@@ -4283,6 +4297,38 @@ ${followupRecordsText(records, task)}`;
                 form.elements.account.value = button.dataset.demoAccount;
                 form.elements.password.value = "123456";
             });
+        });
+        document.getElementById("forgot-password-toggle").addEventListener("click", () => {
+            const panel = document.getElementById("forgot-password-panel");
+            panel.hidden = !panel.hidden;
+        });
+        document.getElementById("forgot-password-submit").addEventListener("click", async () => {
+            const form = document.getElementById("login-form");
+            const message = document.getElementById("login-message");
+            const body = {
+                account: form.elements.resetAccount.value,
+                phone: form.elements.resetPhone.value,
+                idCard: form.elements.resetIdCard.value,
+                newPassword: form.elements.resetPassword.value
+            };
+            try {
+                requireValid(message, [
+                    validateCleanText("账号", body.account, 2, 30),
+                    body.phone && /^1[3-9]\d{9}$/.test(body.phone) ? "" : "手机号格式不正确",
+                    body.idCard && /^\d{17}[\dXx]$/.test(body.idCard) ? "" : "身份证号格式不正确",
+                    body.newPassword && body.newPassword.length >= 6 ? "" : "新密码长度至少 6 位"
+                ]);
+                message.textContent = "正在重置密码...";
+                await api("/api/users/password/forgot", {
+                    method: "POST",
+                    body: JSON.stringify(body)
+                });
+                form.elements.password.value = body.newPassword;
+                document.getElementById("forgot-password-panel").hidden = true;
+                message.textContent = "密码已重置，请使用新密码登录。";
+            } catch (error) {
+                message.textContent = error.message;
+            }
         });
         document.getElementById("login-form").addEventListener("submit", async event => {
             event.preventDefault();
@@ -4316,6 +4362,18 @@ ${followupRecordsText(records, task)}`;
                     <h1>创建认养门户账号</h1>
                     <p>前台注册只创建普通用户账号。志愿者、医院用户和管理员由后台用户管理或演示数据维护。</p>
                     <div class="flow-line"><span>实名信息</span><span>提交线索</span><span>申请认养</span><span>查看消息</span></div>
+                    <div class="auth-cat-showcase register-cat-showcase">
+                        <img src="/uploads/cats/cat_02_01.jpg" alt="校园猫咪坐在草地上的照片">
+                        <div class="auth-cat-note">
+                            <strong>注册后可以提交线索和认养申请</strong>
+                            <span>请填写真实联系方式，志愿者会根据申请和回访信息与你联系。</span>
+                        </div>
+                    </div>
+                    <div class="register-tips">
+                        <span>实名信息用于申请审核</span>
+                        <span>手机号用于志愿者联系</span>
+                        <span>密码至少 6 位</span>
+                    </div>
                     <a class="ghost-btn" href="#/login">返回登录</a>
                 </div>
                 <form class="auth-card" id="register-form">
