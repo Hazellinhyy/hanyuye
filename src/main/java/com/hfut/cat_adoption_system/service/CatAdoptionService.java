@@ -270,11 +270,7 @@ public class CatAdoptionService {
     }
 
     public Cat getPublicCat(String catId) {
-        Cat cat = findCat(catId);
-        if (cat.status() != CatStatus.ADOPTABLE) {
-            throw new BusinessException("当前猫咪暂未发布认养");
-        }
-        return cat;
+        return findCat(catId);
     }
 
     public List<Cat> listAdminCats(CatStatus status, HealthLevel healthLevel, String gender,
@@ -627,7 +623,7 @@ public class CatAdoptionService {
         medicalRecordMapper.insertAdminRecord(medicalId, catId, request.recordDate() == null ? LocalDate.now() : request.recordDate(),
                 operator.college() == null || operator.college().isBlank() ? "校内合作医院" : operator.college(),
                 healthLevel, vaccinated, sterilized, request.description(), note, normalizeRecordType(request.recordType()),
-                operator.userId(), request.cost(), request.attachmentUrl(), request.abnormalFlag(), now);
+                operator.userId(), request.attachmentUrl(), request.abnormalFlag(), now);
         CatStatus nextStatus = (healthLevel == HealthLevel.C || request.abnormalFlag()) ? CatStatus.MEDICAL : cat.status();
         catMapper.updateHealth(catId, healthLevel, sterilized, vaccinated, nextStatus, now);
         logOperation(operator, "新增医疗记录", "CAT", catId, cat.status().name(), nextStatus.name(),
@@ -658,7 +654,7 @@ public class CatAdoptionService {
                 request.recordDate() == null ? LocalDate.now() : request.recordDate(),
                 operator.college() == null || operator.college().isBlank() ? "校内合作医院" : operator.college(),
                 healthLevel, vaccinated, sterilized, request.description(), note, normalizeRecordType(request.recordType()),
-                operator.userId(), request.cost(), request.attachmentUrl(), request.abnormalFlag(), now);
+                operator.userId(),  request.attachmentUrl(), request.abnormalFlag(), now);
         if (updated == 0) {
             throw new BusinessException("医疗记录更新失败");
         }

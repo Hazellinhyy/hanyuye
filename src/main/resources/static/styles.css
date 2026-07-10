@@ -4162,6 +4162,16 @@ body.mis-active #mis-shell {
     grid-template-rows: 260px minmax(0, 1fr);
 }
 
+.archive-cat-grid .home-cat-image-wrap {
+    background: #f6f8f7;
+}
+
+.archive-cat-grid .home-cat-card .home-cat-image {
+    object-fit: contain;
+    object-position: center;
+    background: #f6f8f7;
+}
+
 .front-home .hero,
 .front-home .section,
 .front-home .metrics,

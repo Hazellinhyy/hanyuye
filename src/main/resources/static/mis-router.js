@@ -2083,7 +2083,7 @@
                         <option value="屯溪路校区">屯溪路校区</option>
                         <option value="宣城校区">宣城校区</option>
                     </select>
-
+                    <input name="foundArea" class="clue-custom-input" placeholder="请输入校园区域">
                     <button class="ghost-btn compact add-choice-btn" type="button" data-save-custom="foundArea">保存到下拉框</button>
                 </label>
                 <label class="wide clue-select-field">发现地点
@@ -3014,7 +3014,6 @@
                                     <label>记录类型<select name="recordType"><option value="CHECKUP">体检</option><option value="VACCINE">疫苗</option><option value="STERILIZATION">绝育</option><option value="TREATMENT">治疗</option><option value="OTHER">其他</option></select></label>
                                     <label>记录日期<input name="recordDate" type="date"></label>
                                     <label>健康结果<select name="healthResult"><option value="HEALTHY">健康</option><option value="OBSERVE">需观察</option><option value="SICK">患病</option><option value="SERIOUS">严重异常</option></select></label>
-                                    <label>费用<input name="cost" type="number" step="0.01"></label>
                                 </div>
                             </div>
                             <div class="medical-form-section">
@@ -3091,7 +3090,6 @@
                 const medicalId = body.medicalId;
                 delete body.medicalId;
                 body.abnormalFlag = form.get("abnormalFlag") === "on";
-                body.cost = body.cost ? Number(body.cost) : null;
                 const message = document.getElementById("medical-message");
                 message.textContent = "";
                 try {
@@ -3100,8 +3098,7 @@
                         throw new Error("请先点击上传附件图片，上传完成后再保存医疗记录。");
                     }
                     requireValid(message, [
-                        validateCleanText("医疗说明", body.description, 5, 500),
-                        body.cost !== null && body.cost < 0 ? "费用不能为负数" : ""
+                        validateCleanText("医疗说明", body.description, 5, 500)
                     ]);
                     if (medicalId) {
                         await api(`/api/admin/medical-records/${medicalId}`, { method: "PUT", body: JSON.stringify(body) });
@@ -3129,7 +3126,6 @@
                 form.elements.healthResult.value = record.healthLevel === "A" ? "HEALTHY" : record.healthLevel === "C" ? "SICK" : "OBSERVE";
                 form.elements.vaccineStatus.value = record.vaccinated ? "VACCINATED" : "UNKNOWN";
                 form.elements.sterilizedStatus.value = record.sterilized ? "STERILIZED" : "UNKNOWN";
-                form.elements.cost.value = "";
                 medicalAttachmentUpload.setValue(record.attachmentUrl || "");
                 form.elements.description.value = record.treatment || record.doctorNote || "";
                 form.elements.abnormalFlag.checked = record.healthLevel === "C";
@@ -4469,9 +4465,10 @@ ${followupRecordsText(records, task)}`;
         const panel = shell.querySelector(".front-home");
         const hideFrontSelfService = !canUseFrontSelfService(user);
         try {
-            const [stats, cats, notices, roleData] = await Promise.all([
+            const [stats, cats, allCats, notices, roleData] = await Promise.all([
                 api("/api/dashboard/stats").catch(() => ({})),
                 api("/api/cats/public").catch(() => []),
+                api("/api/cats").catch(() => []),
                 api("/api/notices").catch(() => []),
                 loadRolePortalData(user)
             ]);
@@ -4542,6 +4539,12 @@ ${followupRecordsText(records, task)}`;
                     <div class="section-head"><div><p class="eyebrow">Adoption</p><h2>可认养猫咪推荐</h2></div><a class="ghost-btn" href="#/cats">全部猫咪</a></div>
                     <div class="mis-cat-grid showcase">
                         ${(cats || []).slice(0, 6).map(cat => homeCatCard(cat)).join("") || `<div class="mis-empty">暂无可认养猫咪</div>`}
+                    </div>
+                </section>
+                <section class="section">
+                    <div class="section-head"><div><p class="eyebrow">Archive</p><h2>已建档全部猫咪</h2></div><a class="ghost-btn" href="#/cats">查看可认养</a></div>
+                    <div class="mis-cat-grid showcase archive-cat-grid">
+                        ${(allCats || []).slice(0, 12).map(cat => homeCatCard(cat)).join("") || `<div class="mis-empty">暂无已建档猫咪</div>`}
                     </div>
                 </section>
                 <section class="section split">
